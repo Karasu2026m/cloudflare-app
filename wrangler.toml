@@ -1,0 +1,8 @@
+name = "inventory-api"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+# 環境変数（デプロイ時にwrangler secretで設定）
+# GAS_URL = "https://script.google.com/macros/s/xxxxx/exec"
+# GAS_API_KEY = "ランダム生成キー"
+# ALLOWED_ORIGIN = "https://your-project.pages.dev"

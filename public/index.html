@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>📦 在庫スキャンシステム V4</title>
+  <!-- ZXing: Code128/QR等のバーコードを読み取るライブラリ（mockupと同じv0.21.3） -->
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js" type="text/javascript"></script>
+  <!-- Quagga2: 静止画からのバーコード検出に特化（位置・角度自動検出） -->
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js" type="text/javascript"></script>
+  <!-- Material Icons for UI -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* =========================================
+       Glassmorphism Premium CSS Theme
+       ========================================= */
+    :root {
+      --bg-color: #0f172a;
+      /* Deep Slate */
+      --card-bg: rgba(255, 255, 255, 0.07);
+      --card-border: rgba(255, 255, 255, 0.15);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+
+      --accent-in: #3b82f6;
+      /* Blue */
+      --accent-out: #f59e0b;
+      /* Amber */
+      --accent-audit: #8b5cf6;
+      /* Purple */
+      --accent-defect: #ef4444;
+      /* Red */
+      --accent-assembly: #10b981;
+      /* Emerald */
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      margin: 0;
+      padding: 15px;
+      padding-bottom: 90px;
+      /* Space for sticky cart */
+      color: var(--text-main);
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+
+    /* Glass Panel Utility */
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 5px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      font-size: 22px;
+      background: -webkit-linear-gradient(45deg, #60a5fa, #c084fc);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Modern Toggle Buttons */
+    .nav-scroller {
+      overflow-x: auto;
+      margin-bottom: 20px;
+      padding-bottom: 5px;
+    }
+
+    .toggle-container {
+      display: flex;
+      gap: 10px;
+      width: max-content;
+    }
+
+    .toggle-btn {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toggle-btn:active {
+      transform: scale(0.96);
+    }
+
+    .toggle-btn.active.in {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent-in);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .toggle-btn.active.out {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-out);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+    }
+
+    .toggle-btn.active.assembly {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--accent-assembly);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .toggle-btn.active.audit {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: var(--accent-audit);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+    }
+
+    .toggle-btn.active.defect {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-defect);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+    }
+
+    /* Scanner UI */
+    #reader {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 15px;
+      border: 1px solid var(--card-border);
+      display: none;
+    }
+
+    .action-btn {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 16px;
+      font-size: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    /* リアルタイムカメラ */
+    #cameraArea {
+      position: relative;
+      margin-bottom: 15px;
+      border-radius: 12px;
+      overflow: hidden;
+      display: none;
+    }
+    #cameraArea video {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+    }
+    #cameraArea .scan-overlay {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 70%; height: 30%;
+      border: 2px solid rgba(16, 185, 129, 0.8);
+      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.3);
+    }
+    .camera-toggle-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      border: none;
+      padding: 16px;
+      font-size: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    .camera-toggle-btn:active { transform: scale(0.98); }
+    .camera-toggle-btn.active {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    }
+
+    .action-btn:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .action-btn.danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-defect);
+    }
+
+    /* Input Fields */
+    .input-box {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      font-size: 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: white;
+      outline: none;
+      transition: border-color 0.3s;
+      text-align: center;
+      font-family: inherit;
+      margin-bottom: 10px;
+    }
+
+    .input-box:focus {
+      border-color: var(--accent-in);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Assembly (Picking) UI */
+    #assemblyArea {
+      display: none;
+      margin-bottom: 15px;
+    }
+
+    .parts-list {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .part-item {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s;
+    }
+
+    .part-item.ready {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--accent-assembly);
+    }
+
+    .part-item .desc {
+      font-size: 14px;
+      color: var(--text-main);
+    }
+
+    .part-item .status {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .part-item.ready .status {
+      background: var(--accent-assembly);
+      color: #fff;
+    }
+
+    /* Status Notice */
+    #status {
+      font-size: 15px;
+      font-weight: 600;
+      min-height: 40px;
+      margin: 15px 0;
+      padding: 15px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      color: var(--text-muted);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    /* UI Flashes */
+    @keyframes errorFlash {
+      0% {
+        background-color: rgba(239, 68, 68, 0.8);
+      }
+
+      100% {
+        background-color: transparent;
+      }
+    }
+
+    .flash-error {
+      animation: errorFlash 0.5s ease-out;
+    }
+
+    @keyframes successFlash {
+      0% {
+        background-color: rgba(16, 185, 129, 0.6);
+      }
+
+      100% {
+        background-color: transparent;
+      }
+    }
+
+    .flash-success {
+      animation: successFlash 0.5s ease-out;
+    }
+
+    /* =========================================
+       Full Screen Cart Modal UI (Replaces Drawer)
+       ========================================= */
+    .cart-drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    .cart-drawer.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .cart-header {
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      height: 40px;
+      /* Ensure clicks register on the whole header area */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .cart-header * {
+      pointer-events: none;
+      /* Let the parent catch the click */
+    }
+
+    .cart-header .close-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      /* Required to override parents none */
+    }
+
+    .cart-content {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 40px;
+      /* Safe area */
+    }
+
+    .cart-item {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cart-item-info {
+      flex: 1;
+    }
+
+    .cart-item-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .cart-item-code {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .cart-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .qty-icon-btn {
+      background: transparent;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      border-radius: 4px;
+    }
+
+    .qty-icon-btn:active {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .qty-val {
+      font-weight: bold;
+      width: 24px;
+      text-align: center;
+    }
+
+    .del-btn {
+      color: var(--accent-defect);
+      margin-left: 10px;
+    }
+
+    .submit-cart-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      border: none;
+      color: white;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 10px;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .submit-cart-btn:active {
+      transform: scale(0.98);
+    }
+
+    .submit-cart-btn:disabled {
+      background: #475569;
+      box-shadow: none;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    /* Floating Fixed "View Cart" Button at the bottom of the screen */
+    .floating-cart-btn {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      cursor: pointer;
+      width: 90%;
+      max-width: 400px;
+      justify-content: center;
+    }
+
+    .floating-cart-btn.has-items {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+      }
+
+      70% {
+        box-shadow: 0 0 0 15px rgba(59, 130, 246, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Full Screen Flash Overlay for Errors -->
+  <div id="flashOverlay"
+    style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9999;"></div>
+
+  <div class="glass-panel" id="mainCard">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Fushicho Inventory V4</h2>
+      <button onclick="toggleAdminMode()" id="adminToggleBtn"
+        style="background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); color:var(--accent-defect); border-radius:8px; padding:4px 8px; font-size:11px; cursor:pointer;">
+        管理者モードON
+      </button>
+    </div>
+
+    <div class="nav-scroller">
+      <div class="toggle-container">
+        <div id="btnIn" class="toggle-btn active in" onclick="setMode('入庫')">
+          <span class="material-icons-round" style="font-size:18px;">download</span>入庫
+        </div>
+        <div id="btnAssembly" class="toggle-btn" onclick="setMode('組み立て')">
+          <span class="material-icons-round" style="font-size:18px;">build</span>組み立てピッキング
+        </div>
+        <div id="btnOut" class="toggle-btn" onclick="setMode('出庫')">
+          <span class="material-icons-round" style="font-size:18px;">upload</span>通常出庫
+        </div>
+        <div id="btnAudit" class="toggle-btn" onclick="setMode('棚卸')">
+          <span class="material-icons-round" style="font-size:18px;">fact_check</span>棚卸
+        </div>
+        <div id="btnDefect" class="toggle-btn" onclick="setMode('不良報告')">
+          <span class="material-icons-round" style="font-size:18px;">warning</span>不良報告
+        </div>
+      </div>
+    </div>
+
+    <!-- Assembly Picking Area -->
+    <div id="assemblyArea" class="glass-panel" style="padding: 15px;">
+      <div style="font-size: 13px; color: var(--accent-assembly); font-weight: bold; margin-bottom: 8px;">🔧 組み立て指示書 番号
+      </div>
+      <div style="display:flex; gap:10px;">
+        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0;" value="#" placeholder="#PC-001..."
+          autocomplete="off">
+        <button class="action-btn" style="width:auto; margin:0;" onclick="loadAssembly()">読込</button>
+      </div>
+      <div id="assemblyMemo"
+        style="margin-top:10px; font-size:12px; color:var(--text-out); background:rgba(245, 158, 11, 0.1); padding:8px; border-radius:8px; display:none;">
+      </div>
+      <div class="parts-list" id="assemblyPartsList">
+        <div style="text-align:center; color: var(--text-muted); font-size: 13px; padding: 10px;">番号を入力して「読込」を押してください
+        </div>
+      </div>
+    </div>
+
+    <!-- リアルタイムカメラスキャン -->
+    <button class="camera-toggle-btn" id="cameraToggleBtn" onclick="toggleCamera()">
+      <span class="material-icons-round">videocam</span>
+      リアルタイムカメラスキャン
+    </button>
+    <div id="cameraArea">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <div class="scan-overlay"></div>
+    </div>
+
+    <!-- 静止画スキャン（フォールバック）-->
+    <label class="action-btn" for="camera-scan"
+      style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-assembly); margin-bottom: 10px;">
+      <span class="material-icons-round">add_a_photo</span>
+      カメラで1枚撮影してスキャン
+    </label>
+    <input type="file" id="camera-scan" accept="image/*" capture="environment" style="display:none;"
+      onchange="scanImage(this)">
+
+    <label class="action-btn" for="file-scan"
+      style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-assembly);">
+      <span class="material-icons-round">add_photo_alternate</span>
+      アルバムから複数選んで一括スキャン
+    </label>
+    <input type="file" id="file-scan" accept="image/*" multiple style="display:none;" onchange="scanImage(this)">
+
+    <!-- Undo Button -->
+    <button class="action-btn" onclick="undo()"
+      style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: var(--accent-defect);">
+      <span class="material-icons-round">undo</span>
+      直前の履歴を完全に取り消す (Undo)
+    </button>
+
+    <input type="text" id="barcodeInput" class="input-box" placeholder="バーコードを手動入力..." autocomplete="off"
+      style="margin-top: 15px;">
+
+    <!-- Status Log -->
+    <div id="status">
+      <span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span>
+      <span>スキャン待ちです</span>
+    </div>
+
+  </div>
+
+  <!-- Floating Open Cart Button -->
+  <button class="floating-cart-btn" onclick="toggleCartDrawer()">
+    <span class="material-icons-round">shopping_cart</span>
+    カートを確認・送信 (<span id="cartBadgeCnt">0</span>)
+  </button>
+
+  <!-- Full Screen Cart Modal -->
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="cart-header">
+      <div style="font-size: 18px; font-weight: 800; display:flex; align-items:center; gap:8px;">
+        <span class="material-icons-round">shopping_cart</span>
+        カート一覧
+      </div>
+      <button class="close-btn" onclick="toggleCartDrawer()">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+
+    <div class="cart-content">
+      <div id="cartItemList" style="min-height: 100px;">
+        <div style="text-align:center; padding: 50px 0; color:var(--text-muted); font-size:16px;">
+          カートは空です
+        </div>
+      </div>
+
+      <button class="submit-cart-btn" id="submitCartBtn" onclick="submitCart()" disabled style="margin-top:20px;">
+        <span class="material-icons-round">cloud_upload</span>
+        確定してデータを送信
+      </button>
+    </div>
+  </div>
+
+
+  <script>
+    // ============================================
+    // Cloudflare Workers API設定
+    // デプロイ後にWorkerのURLに変更してください
+    // ============================================
+    const API_URL = '/api'; // Cloudflare Pages Functions または Workers URL
+
+    let currentMode = '入庫';
+    let isProcessing = false;
+    let isCameraOn = false;
+    let codeReader = null; // ZXing BrowserMultiFormatReader
+
+    // V4 State
+    let cart = []; // [{code: 'A', name: 'Product A', qty: 1}, ...]
+    let assemblyTargetParts = []; // Data loaded from directive sheet
+    let assemblyValidationDisabled = false; // Override flag
+    let adminMode = false;
+    // Array of {code: 'R5...', requiredQty: 1, currentQty: 0, name: 'R5 4500'}
+
+    /**
+     * Cloudflare Workers API呼び出し共通関数
+     */
+    async function callAPI(action, params = {}) {
+      const body = { action, ...params };
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
+
+    /**
+     * リアルタイムカメラスキャン（ZXing BrowserMultiFormatReader）
+     */
+    async function toggleCamera() {
+      const btn = document.getElementById('cameraToggleBtn');
+      const area = document.getElementById('cameraArea');
+
+      if (isCameraOn) {
+        // カメラ停止
+        if (codeReader) { codeReader.reset(); codeReader = null; }
+        area.style.display = 'none';
+        btn.classList.remove('active');
+        btn.innerHTML = '<span class="material-icons-round">videocam</span> リアルタイムカメラスキャン';
+        isCameraOn = false;
+        return;
+      }
+
+      try {
+        btn.innerHTML = '<span class="material-icons-round">hourglass_top</span> カメラ起動中...';
+
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+        area.style.display = 'block';
+        isCameraOn = true;
+        btn.classList.add('active');
+        btn.innerHTML = '<span class="material-icons-round">videocam_off</span> カメラを停止';
+
+        await codeReader.decodeFromVideoDevice(
+          undefined, // デフォルトの背面カメラ
+          'cameraVideo',
+          (result, err) => {
+            if (result) {
+              const code = result.getText();
+              playBeep('success');
+              flashScreen('success');
+              processBarcodeLocally(code);
+            }
+            // err は NotFoundException 等（バーコード未検出時）なので無視
+          }
+        );
+      } catch (e) {
+        playBeep('error');
+        setStatus(`❌ カメラ起動失敗: ${e.message}`, true);
+        area.style.display = 'none';
+        btn.classList.remove('active');
+        btn.innerHTML = '<span class="material-icons-round">videocam</span> リアルタイムカメラスキャン';
+        isCameraOn = false;
+      }
+    }
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+
+      if (type === 'success') {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+        gain.gain.setValueAtTime(1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'error') {
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        gain.gain.setValueAtTime(1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+      } else if (type === 'complete') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(1, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+      }
+    }
+
+    function flashScreen(type) {
+      const o = document.getElementById('flashOverlay');
+      o.className = type === 'error' ? 'flash-error' : 'flash-success';
+      setTimeout(() => { o.className = ''; }, 500);
+    }
+
+    function toggleAdminMode() {
+      if (!adminMode) {
+        if (!confirm("⚠️ 【警告】管理者モードをオンにしますか？\n\n機能: バーコードを一切読み込まずに手動で強制的・無制限に出庫チェックが行えるようになります。\n注意: ミス（商品の取り違えや在庫ズレ）が直接発生するリスクがあるため、バーコードが存在しないパーツ等の緊急時にのみ、細心の注意を払って使用してください。")) return;
+        adminMode = true;
+        document.getElementById('adminToggleBtn').style.background = "rgba(239, 68, 68, 0.8)";
+        document.getElementById('adminToggleBtn').style.color = "white";
+        document.getElementById('adminToggleBtn').innerText = "管理者モード実行中";
+        flashScreen('error');
+      } else {
+        adminMode = false;
+        document.getElementById('adminToggleBtn').style.background = "rgba(239, 68, 68, 0.1)";
+        document.getElementById('adminToggleBtn').style.color = "var(--accent-defect)";
+        document.getElementById('adminToggleBtn').innerText = "管理者モードON";
+      }
+      updateAssemblyListUI();
+    }
+
+    function setStatus(msg, isError) {
+      const el = document.getElementById('status');
+      el.innerHTML = msg;
+      el.style.color = isError ? "#ef4444" : "#10b981";
+      el.style.borderColor = isError ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)";
+    }
+
+    function setMode(mode) {
+      if (cart.length > 0) {
+        if (!confirm("カートにデータが残っています。モードを切り替えるとカートは空になります。よろしいですか？")) return;
+      }
+
+      currentMode = mode;
+      cart = [];
+      assemblyTargetParts = [];
+      assemblyValidationDisabled = false;
+      renderCart();
+
+      // Defensively close cart
+      document.getElementById('cartDrawer').classList.remove('open');
+
+      document.querySelectorAll('.toggle-btn').forEach(b => {
+        b.className = b.className.replace(/active \w+/, '').trim();
+      });
+
+      let btnMap = { '入庫': 'btnIn', '出庫': 'btnOut', '組み立て': 'btnAssembly', '棚卸': 'btnAudit', '不良報告': 'btnDefect' };
+      let clsMap = { '入庫': 'in', '出庫': 'out', '組み立て': 'assembly', '棚卸': 'audit', '不良報告': 'defect' };
+
+      document.getElementById(btnMap[mode]).classList.add('active', clsMap[mode]);
+      document.getElementById('assemblyArea').style.display = (mode === '組み立て') ? 'block' : 'none';
+
+      setStatus(`<span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span><br>【${mode}】スキャン待ち`, false);
+    }
+
+    /* Cart Logic */
+    function toggleCartDrawer() {
+      const d = document.getElementById('cartDrawer');
+      if (d.classList.contains('open')) {
+        d.classList.remove('open');
+      } else {
+        d.classList.add('open');
+      }
+    }
+
+    function renderCart() {
+      const list = document.getElementById('cartItemList');
+      document.getElementById('cartBadgeCnt').innerText = cart.length;
+
+      if (cart.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding: 50px 0; color:var(--text-muted); font-size:16px;">カートは空です</div>`;
+        document.getElementById('submitCartBtn').disabled = true;
+        document.querySelector('.floating-cart-btn').classList.remove('has-items');
+        return;
+      }
+
+      document.querySelector('.floating-cart-btn').classList.add('has-items');
+
+      let html = '';
+      cart.forEach((item, index) => {
+        let extraInput = '';
+        if (currentMode === '入庫') {
+          extraInput = `
+            <div style="margin-top: 6px;">
+              <input type="number" class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);" 
+                placeholder="発注数を手動入力 (空欄で全自動計算)" 
+                value="${item.customOrderQty || ''}" 
+                onchange="cart[${index}].customOrderQty = this.value">
+            </div>
+          `;
+        } else if (currentMode === '棚卸') {
+          extraInput = `
+            <div style="margin-top: 6px;">
+              <label style="font-size:11px; color:var(--text-muted); display:inline-block; margin-bottom:4px;">実地数(カウントした数):</label>
+              <input type="number" class="input-box" style="margin:0; padding: 6px 12px; font-size:14px; background: rgba(0,0,0,0.2);" 
+                placeholder="数量を入力" 
+                value="${item.qty}" 
+                onchange="cart[${index}].qty = Math.max(1, parseInt(this.value)||1); renderCart();">
+            </div>
+          `;
+        } else if (currentMode === '不良報告') {
+          extraInput = `
+            <div style="margin-top: 6px; display:flex; flex-direction:column; gap:6px;">
+              <select class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);" onchange="cart[${index}].defectReason = this.value">
+                <option value="初期不良" ${item.defectReason === '初期不良' ? 'selected' : ''}>初期不良</option>
+                <option value="破損" ${item.defectReason === '破損' ? 'selected' : ''}>破損</option>
+                <option value="紛失" ${item.defectReason === '紛失' ? 'selected' : ''}>紛失</option>
+                <option value="その他" ${item.defectReason === 'その他' ? 'selected' : ''}>その他</option>
+              </select>
+              <input type="text" class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);" 
+                placeholder="備考(例: ピン折れ)" 
+                value="${item.defectMemo || ''}" 
+                onchange="cart[${index}].defectMemo = this.value">
+            </div>
+          `;
+        }
+
+        html += `
+      <div class="cart-item" style="flex-direction: column; align-items: stretch;">
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+          <div class="cart-item-info">
+            <div class="cart-item-name">${item.name || item.code}</div>
+            <div class="cart-item-code">${item.code}</div>
+          </div>
+          <div class="cart-item-actions">
+            <button class="qty-icon-btn" onclick="adjCart(${index}, -1)"><span class="material-icons-round" style="font-size:18px;">remove</span></button>
+            <div class="qty-val">${item.qty}</div>
+            <button class="qty-icon-btn" onclick="adjCart(${index}, 1)"><span class="material-icons-round" style="font-size:18px;">add</span></button>
+            <button class="qty-icon-btn del-btn" onclick="delCart(${index})"><span class="material-icons-round" style="font-size:18px;">delete</span></button>
+          </div>
+        </div>
+        ${extraInput}
+      </div>`;
+      });
+      list.innerHTML = html;
+
+      // In assembly mode, checking if everything is satisfied
+      if (currentMode === '組み立て') {
+        let isReady = checkAssemblySatisfied();
+        document.getElementById('submitCartBtn').disabled = !isReady;
+      } else {
+        document.getElementById('submitCartBtn').disabled = false;
+      }
+    }
+
+    function adjCart(index, delta) {
+      if (cart[index].qty + delta > 0) {
+        cart[index].qty += delta;
+
+        // If assembly mode, check max bounds to prevent over-picking
+        if (currentMode === '組み立て') {
+          let target = assemblyTargetParts.find(p => p.code === cart[index].code || p.name === cart[index].code);
+          if (target && cart[index].qty > target.requiredQty) {
+            cart[index].qty = target.requiredQty; // Block
+            playBeep('error');
+          }
+        }
+        renderCart();
+        updateAssemblyListUI();
+      }
+    }
+
+    function delCart(index) {
+      cart.splice(index, 1);
+      renderCart();
+      updateAssemblyListUI();
+    }
+
+    // Barcode Processing (Offline to Cart)
+    const inputEl = document.getElementById('barcodeInput');
+    inputEl.addEventListener('keyup', e => {
+      if (e.key === 'Enter') {
+        processBarcodeLocally(inputEl.value.trim());
+        inputEl.value = '';
+      }
+    });
+
+    function onScanSuccess(decodedText) {
+      processBarcodeLocally(decodedText.trim());
+    }
+
+    // ============================================================
+    // バーコードスキャン（BarcodeDetector API + ZXing二段フォールバック）
+    // ============================================================
+
+    /**
+     * Canvas上で画像を前処理して読み取りやすくする
+     * - コントラスト強化・グレースケール変換
+     */
+    function preprocessImageToCanvas(img) {
+      const canvas = document.createElement('canvas');
+      const MAX_DIM = 1600; // 大きすぎる画像を縮小して高速化
+      let w = img.width, h = img.height;
+      if (w > MAX_DIM || h > MAX_DIM) {
+        const scale = MAX_DIM / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      // グレースケール + コントラスト強化フィルタ
+      ctx.filter = 'grayscale(1) contrast(1.8) brightness(1.1)';
+      ctx.drawImage(img, 0, 0, w, h);
+      return canvas;
+    }
+
+    /**
+     * BarcodeDetector API（ブラウザネイティブ）でスキャン
+     * Chrome/Edge/Android Safari 等で使用可能
+     */
+    async function scanWithBarcodeDetector(imageFile) {
+      if (!('BarcodeDetector' in window)) return null;
+      try {
+        const formats = ['code_128', 'code_39', 'qr_code', 'ean_13', 'ean_8', 'data_matrix', 'code_93'];
+        // サポートされているformatだけに絞る
+        let supported = formats;
+        try {
+          supported = await BarcodeDetector.getSupportedFormats();
+          supported = formats.filter(f => supported.includes(f));
+          if (supported.length === 0) supported = formats;
+        } catch(e) {}
+
+        const detector = new BarcodeDetector({ formats: supported });
+
+        // オリジナル画像でまず試す
+        const bitmap = await createImageBitmap(imageFile);
+        let barcodes = await detector.detect(bitmap);
+        if (barcodes.length > 0) return barcodes[0].rawValue;
+
+        // 前処理済み画像で再試行
+        const img = new Image();
+        img.src = URL.createObjectURL(imageFile);
+        await new Promise(r => { img.onload = r; });
+        const canvas = preprocessImageToCanvas(img);
+        URL.revokeObjectURL(img.src);
+        const bitmap2 = await createImageBitmap(canvas);
+        barcodes = await detector.detect(bitmap2);
+        if (barcodes.length > 0) return barcodes[0].rawValue;
+
+        return null;
+      } catch(e) {
+        return null;
+      }
+    }
+
+    /**
+     * ZXing低レベルAPIでCanvasをデコード（TRY_HARDER正常出力）
+     */
+    function makeCanvas(img, filter, maxDim) {
+      const canvas = document.createElement('canvas');
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+      if (maxDim && (w > maxDim || h > maxDim)) {
+        const sc = maxDim / Math.max(w, h);
+        w = Math.round(w * sc); h = Math.round(h * sc);
+      }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.filter = filter || 'none';
+      ctx.drawImage(img, 0, 0, w, h);
+      return canvas;
+    }
+
+    function zxingDecodeCanvas(canvas) {
+      if (typeof ZXing === 'undefined') return null;
+      try {
+        // HTMLCanvasElementLuminanceSource: ZXing内部と同じ正しいRGBA→luminance変換
+        const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+        ]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        const reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+
+        // 1. HybridBinarizer で試す
+        try {
+          const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+          const result = reader.decode(bmp);
+          if (result) return result.getText();
+        } catch(e) {}
+
+        // 2. GlobalHistogramBinarizer で試す（コントラスト低い場合に有効）
+        try {
+          const bmp2 = new ZXing.BinaryBitmap(new ZXing.GlobalHistogramBinarizer(luminanceSource));
+          const result2 = reader.decode(bmp2);
+          if (result2) return result2.getText();
+        } catch(e) {}
+
+        // 3. 反転画像で試す
+        try {
+          const inverted = luminanceSource.invert();
+          const bmp3 = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(inverted));
+          const result3 = reader.decode(bmp3);
+          if (result3) return result3.getText();
+        } catch(e) {}
+
+        return null;
+      } catch(e) { return null; }
+    }
+
+    async function scanWithZXing(imageFile) {
+      if (typeof ZXing === 'undefined') return null;
+      const debugLog = [];
+      try {
+        const url = URL.createObjectURL(imageFile);
+        const img = new Image();
+        await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+        URL.revokeObjectURL(url);
+        if (!img.naturalWidth) return null;
+        debugLog.push(`img:${img.naturalWidth}x${img.naturalHeight}`);
+
+        // ---- ZXingリーダー設定（フォーマット制限なし = 全自動検出）----
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+        function tryDecode(canvas, label) {
+          try {
+            const src = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+            const reader = new ZXing.MultiFormatReader();
+            reader.setHints(hints);
+            try {
+              const r = reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src)));
+              if (r) { debugLog.push(`✅${label}H:${r.getText()}`); return r.getText(); }
+            } catch(e) {}
+            try {
+              const r2 = reader.decode(new ZXing.BinaryBitmap(new ZXing.GlobalHistogramBinarizer(src)));
+              if (r2) { debugLog.push(`✅${label}G:${r2.getText()}`); return r2.getText(); }
+            } catch(e) {}
+          } catch(e) { debugLog.push(`E${label}:${(e.message||'').substring(0,15)}`); }
+          return null;
+        }
+
+        // ---- 戦略1: フル画像（複数解像度）----
+        const dims = [null, 1280, 800, 640]; // null = 元サイズ
+        for (const maxDim of dims) {
+          const c = makeCanvas(img, 'none', maxDim);
+          debugLog.push(`f${maxDim||'orig'}:${c.width}x${c.height}`);
+          const r = tryDecode(c, `f${maxDim||'O'}`);
+          if (r) { _lastDebug = debugLog.join('|'); return r; }
+        }
+
+        // ---- 戦略2: 中央50%クロップ（バーコードが画像の一部） ----
+        for (const maxDim of [null, 1280]) {
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const cw = Math.round(w * 0.5), ch = Math.round(h * 0.5);
+          const cx = Math.round((w - cw) / 2), cy = Math.round((h - ch) / 2);
+          const canvas = document.createElement('canvas');
+          let dw = cw, dh = ch;
+          if (maxDim && (dw > maxDim || dh > maxDim)) {
+            const sc = maxDim / Math.max(dw, dh);
+            dw = Math.round(dw * sc); dh = Math.round(dh * sc);
+          }
+          canvas.width = dw; canvas.height = dh;
+          canvas.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, dw, dh);
+          debugLog.push(`crop:${dw}x${dh}`);
+          const r = tryDecode(canvas, 'C');
+          if (r) { _lastDebug = debugLog.join('|'); return r; }
+        }
+
+        // ---- 戦略3: 90度回転（縦撮り対応）----
+        const rotCanvas = document.createElement('canvas');
+        const rw = img.naturalHeight, rh = img.naturalWidth;
+        const sc90 = Math.min(1, 1280 / Math.max(rw, rh));
+        rotCanvas.width = Math.round(rw * sc90);
+        rotCanvas.height = Math.round(rh * sc90);
+        const rctx = rotCanvas.getContext('2d');
+        rctx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+        rctx.rotate(Math.PI / 2);
+        rctx.drawImage(img, -rotCanvas.height / 2, -rotCanvas.width / 2, rotCanvas.height, rotCanvas.width);
+        debugLog.push(`rot:${rotCanvas.width}x${rotCanvas.height}`);
+        const rr = tryDecode(rotCanvas, 'R');
+        if (rr) { _lastDebug = debugLog.join('|'); return rr; }
+
+        // ---- 戦略4: コントラスト強調 ----
+        for (const f of ['grayscale(1) contrast(1.8)', 'grayscale(1) contrast(2.5)']) {
+          const c = makeCanvas(img, f, 1280);
+          const r = tryDecode(c, 'K');
+          if (r) { _lastDebug = debugLog.join('|'); return r; }
+        }
+
+        debugLog.push('ALL_FAIL');
+        _lastDebug = debugLog.join('|');
+        return null;
+      } catch(e) {
+        debugLog.push(`FATAL:${e.message||e}`);
+        _lastDebug = debugLog.join('|');
+        return null;
+      }
+    }
+    let _lastDebug = '';
+
+    async function scanWithQuagga(imageFile) {
+      if (typeof Quagga === 'undefined') return null;
+      const qLog = [];
+      try {
+        const url = URL.createObjectURL(imageFile);
+        const img = new Image();
+        await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+        URL.revokeObjectURL(url);
+        qLog.push(`Q:${img.naturalWidth}x${img.naturalHeight}`);
+
+        // 複数のpatchSize×解像度で試行
+        const configs = [
+          { maxDim: 800,  patchSize: 'large' },
+          { maxDim: 800,  patchSize: 'medium' },
+          { maxDim: 1280, patchSize: 'large' },
+          { maxDim: 1280, patchSize: 'medium' },
+          { maxDim: 640,  patchSize: 'x-large' },
+          { maxDim: 800,  patchSize: 'x-large' },
+        ];
+
+        for (const cfg of configs) {
+          const canvas = document.createElement('canvas');
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > cfg.maxDim || h > cfg.maxDim) {
+            const sc = cfg.maxDim / Math.max(w, h);
+            w = Math.round(w * sc); h = Math.round(h * sc);
+          }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/png');
+
+          const result = await new Promise((resolve) => {
+            Quagga.decodeSingle({
+              src: dataUrl,
+              numOfWorkers: 0,
+              locate: true,
+              locator: { patchSize: cfg.patchSize, halfSample: false },
+              decoder: { readers: ['code_128_reader'] },
+            }, (r) => resolve(r));
+          });
+
+          if (result && result.codeResult) {
+            qLog.push(`✅${cfg.patchSize}@${cfg.maxDim}:${result.codeResult.code}`);
+            _lastDebug = qLog.join('|');
+            return result.codeResult.code;
+          } else {
+            qLog.push(`${cfg.patchSize[0]}${cfg.maxDim}✗`);
+          }
+        }
+        qLog.push('QFAIL');
+        _lastDebug = qLog.join('|');
+        return null;
+      } catch(e) {
+        qLog.push(`QERR:${(e.message||'').substring(0,20)}`);
+        _lastDebug = qLog.join('|');
+        return null;
+      }
+    }
+
+    function getLibraryStatus() {
+      const bd = ('BarcodeDetector' in window) ? '✅BD' : '❌BD非対応';
+      const zx = (typeof ZXing !== 'undefined') ? '✅ZX' : '❌ZX未ロード';
+      const qg = (typeof Quagga !== 'undefined') ? '✅QG' : '❌QG';
+      return `${bd} ${zx} ${qg}`;
+    }
+
+    /** タイムアウト付きPromise */
+    function withTimeout(promise, ms) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+      ]);
+    }
+
+
+    /**
+     * 1ファイルを複数方式でデコードを試みる
+     */
+    async function decodeSingleFile(file) {
+      // 1. BarcodeDetector API（ネイティブ）- 5秒タイムアウト
+      try {
+        const r1 = await withTimeout(scanWithBarcodeDetector(file), 5000);
+        if (r1) return r1;
+      } catch(e) {}
+      // 2. Quagga2（locate機能付き、傾いたバーコードに強い）- 10秒タイムアウト
+      try {
+        const r2 = await withTimeout(scanWithQuagga(file), 10000);
+        if (r2) return r2;
+      } catch(e) {}
+      // 3. ZXing（フォールバック）- 15秒タイムアウト
+      try {
+        const r3 = await withTimeout(scanWithZXing(file), 15000);
+        if (r3) return r3;
+      } catch(e) {}
+      return null;
+    }
+
+    async function scanImage(input) {
+      if (!input.files || input.files.length === 0) return;
+      const files = Array.from(input.files);
+      setStatus(`⏳ ${files.length}枚の画像を解析中...`, false);
+
+      let successCount = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        if (files.length > 1) {
+          setStatus(`⏳ ${i + 1} / ${files.length} 枚目を解析中...`, false);
+        }
+        const decodedText = await decodeSingleFile(files[i]);
+        if (decodedText) {
+          processBarcodeLocally(decodedText.trim());
+          successCount++;
+        }
+      }
+
+      input.value = "";
+
+      if (successCount > 0) {
+        playBeep('complete');
+        flashScreen('success');
+        setStatus(`✅ ${successCount} / ${files.length} 枚のスキャンに成功しカートに追加しました`, false);
+      } else {
+        playBeep('error');
+        flashScreen('error');
+        setStatus(
+          `⚠️ バーコードを1枚も検出できませんでした<br>` +
+          `<span style="font-size:11px; opacity:0.6;">${getLibraryStatus()}</span><br>` +
+          `<span style="font-size:10px; opacity:0.5; word-break:break-all;">${_lastDebug}</span>`,
+          true
+        );
+      }
+    }
+
+    function processBarcodeLocally(code) {
+      if (!code) return;
+
+      // Server query required first to resolve code -> name IF we don't know it, 
+      // BUT for max offline speed, we can assume the code is valid, push it to cart, 
+      // and let the server figure out names and updates on bulk submit.
+      // However, for Assembly Validation, we need to know what they scanned.
+
+      if (currentMode === '組み立て') {
+        let target = assemblyTargetParts.find(p => p.code === code || p.name === code);
+        if (!target) {
+          if (assemblyValidationDisabled) {
+            playBeep('success');
+            addToCart(code, null, 1);
+            setStatus(`✅ ガード解除中：代替パーツとして追加しました<br>[${code}]`, false);
+            return;
+          } else {
+            playBeep('error');
+            flashScreen('error');
+            setStatus(`⚠️ 指示書にないパーツです！<br>[${code}]`, true);
+            return;
+          }
+        }
+
+        let cartItem = cart.find(c => c.code === code || c.code === target.code);
+        let currQty = cartItem ? cartItem.qty : 0;
+
+        if (currQty >= target.requiredQty) {
+          playBeep('error');
+          setStatus(`⚠️ これ以上必要ありません<br>[${target.name}]`, true);
+          return;
+        }
+
+        playBeep('success');
+        flashScreen('success');
+        addToCart(target.code, target.name, 1);
+        setStatus(`✅ チェックOK<br>[${target.name}]`, false);
+
+      } else {
+        // Normal In/Out
+        playBeep('success');
+        addToCart(code, null, 1);
+        setStatus(`✅ カートに追加しました<br>[${code}]`, false);
+      }
+    }
+
+    function addToCart(code, name, qty) {
+      let existing = cart.find(c => c.code === code);
+      if (existing) {
+        existing.qty += qty;
+      } else {
+        cart.push({ code: code, name: name || code, qty: qty });
+      }
+      renderCart();
+      updateAssemblyListUI();
+
+      // Auto open if complete (optional, we leave it to the user now or flash)
+    }
+
+    /* Assembly Logic */
+    async function loadAssembly() {
+      let input = document.getElementById('assemblyIdInput').value.trim();
+      if (!input) return;
+
+      setStatus("⏳ 指示書読み込み中...", false);
+      isProcessing = true;
+
+      try {
+        const res = await callAPI('getAssemblyOrder', { assemblyId: input });
+        isProcessing = false;
+        if (res.success) {
+          assemblyTargetParts = res.parts;
+          assemblyValidationDisabled = false;
+          cart = [];
+          const memoEl = document.getElementById('assemblyMemo');
+          if (res.memo) {
+            memoEl.innerText = "📝 備考: " + res.memo;
+            memoEl.style.display = "block";
+          } else {
+            memoEl.style.display = "none";
+          }
+          updateAssemblyListUI();
+          setStatus(`✅ 指示書 [${input}] 読込完了`, false);
+          renderCart();
+        } else {
+          playBeep('error');
+          setStatus(`⚠️ ${res.message}`, true);
+        }
+      } catch(err) {
+        playBeep('error');
+        setStatus("⚠️ 通信エラー: " + err.message, true);
+        isProcessing = false;
+      }
+    }
+
+    function updateAssemblyListUI() {
+      if (currentMode !== '組み立て') return;
+      let html = '';
+
+      assemblyTargetParts.forEach((target, index) => {
+        let cartItem = cart.find(c => c.code === target.code || c.name === target.name);
+        let picked = cartItem ? cartItem.qty : 0;
+        let isReady = picked >= target.requiredQty;
+
+        let adminButtonHtml = '';
+        if (adminMode && !isReady) {
+          adminButtonHtml = `
+              <button onclick="adminForceCheckout('${target.code}', '${target.name}', ${target.requiredQty})" style="background:rgba(239,68,68,0.2); color:white; border:none; padding:8px 12px; border-radius:6px; font-size:12px; margin-right:8px; cursor:pointer;">
+                強制出庫
+              </button>
+            `;
+        }
+
+        html += `
+         <div class="part-item ${isReady ? 'ready' : ''}" style="display:flex; justify-content:space-between; align-items:center;">
+           <div>
+             <div class="desc">${target.name}<br><span style="font-size:11px;opacity:0.6;">${target.code}</span></div>
+             <div class="status">${picked} / ${target.requiredQty}</div>
+           </div>
+           <div style="display:flex;">
+             ${adminButtonHtml}
+             <button class="qty-icon-btn del-btn" onclick="removeAssemblyPart(${index})" style="background:rgba(239, 68, 68, 0.1); padding:8px;">
+               <span class="material-icons-round" style="font-size:20px;">close</span>
+             </button>
+           </div>
+         </div>`;
+      });
+      document.getElementById('assemblyPartsList').innerHTML = html;
+
+      if (cart.length > 0 && checkAssemblySatisfied()) {
+        playBeep('complete');
+        setStatus("🎉 すべてのパーツが揃いました！<br>確定ボタンを押してください", false);
+        // Do not force cart drawer open to avoid scroll lock bug overrides
+      }
+    }
+
+    function adminForceCheckout(code, name, requiredQty) {
+      if (!adminMode) return;
+      playBeep('success');
+      flashScreen('error');
+
+      let cartItem = cart.find(c => c.code === code || c.name === name);
+      let picked = cartItem ? cartItem.qty : 0;
+      let missing = requiredQty - picked;
+      if (missing > 0) {
+        addToCart(code, name, missing);
+      }
+      setStatus(`🚨 管理者権限：【${name}】を強制出庫処理しました`, false);
+    }
+
+    function removeAssemblyPart(index) {
+      if (!assemblyValidationDisabled) {
+        if (!confirm("⚠️ 【警告】このパーツを削除すると、今後この指示書での「間違ったパーツの警告（ブロック機能）」が解除され、別の代替パーツを自由にスキャンできるようになります。よろしいですか？")) {
+          return;
+        }
+        assemblyValidationDisabled = true;
+      }
+
+      assemblyTargetParts.splice(index, 1);
+      updateAssemblyListUI();
+    }
+
+    function checkAssemblySatisfied() {
+      // If validation is disabled (a part was deleted), we can always submit the cart
+      if (assemblyValidationDisabled) return true;
+
+      if (assemblyTargetParts.length === 0) return false;
+      for (let target of assemblyTargetParts) {
+        let cartItem = cart.find(c => c.code === target.code || c.name === target.name);
+        let picked = cartItem ? cartItem.qty : 0;
+        if (picked < target.requiredQty) return false;
+      }
+      return true;
+    }
+
+    /* Submit Cart */
+    async function submitCart() {
+      if (cart.length === 0) return;
+      const btn = document.getElementById('submitCartBtn');
+      btn.innerHTML = `<span class="material-icons-round rotate-anim">sync</span> 送信中...`;
+      btn.disabled = true;
+
+      try {
+        const res = await callAPI('submitBulkCart', { type: currentMode, cart: cart });
+        if (res.success) {
+          playBeep('complete');
+          flashScreen('success');
+          setStatus(`✅ 送信完了！<br>${cart.length}種類のデータを処理しました`, false);
+          cart = [];
+          assemblyValidationDisabled = false;
+          document.getElementById('assemblyPartsList').innerHTML = '<div style="text-align:center; color: var(--text-muted); font-size: 13px; padding: 10px;">完了しました。<br>次の番号を入力してください。</div>';
+          document.getElementById('assemblyIdInput').value = '#';
+          document.getElementById('assemblyMemo').style.display = 'none';
+          renderCart();
+          document.getElementById('cartDrawer').classList.remove('open');
+        } else {
+          playBeep('error');
+          setStatus(`⚠️ ${res.message}`, true);
+        }
+      } catch(err) {
+        playBeep('error');
+        setStatus("⚠️ 通信エラーで送信に失敗しました", true);
+      }
+      btn.innerHTML = `<span class="material-icons-round">cloud_upload</span> 確定してデータを送信`;
+      btn.disabled = false;
+    }
+
+    // Undo (Server side call)
+    async function undo() {
+      if (cart.length > 0) {
+        if (!confirm('カートにデータが残っています。スプレッドシート上の直前の操作(Undo)を実行しますか？(カートは空になります)')) return;
+        cart = [];
+        renderCart();
+
+        // Defensively close cart
+        document.getElementById('cartDrawer').classList.remove('open');
+      }
+
+      isProcessing = true;
+      setStatus("⏳ 取り消し中...", false);
+
+      try {
+        const res = await callAPI('undoLastScan', { type: currentMode });
+        if (res.success) {
+          playBeep('complete');
+          flashScreen('success');
+          setStatus(`⏪ ${res.message}`, false);
+        } else {
+          playBeep('error');
+          setStatus(`⚠️ ${res.message}`, true);
+        }
+      } catch(err) {
+        playBeep('error');
+        setStatus("⚠️ 通信エラー", true);
+      }
+      isProcessing = false;
+    }
+
+  </script>
+</body>
+
+</html>
