@@ -208,9 +208,9 @@
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 76%;       /* 横長：バーコード幅に合わせる */
-      height: 40%;      /* 27% × 1.5倍 */
-      min-height: 64px;
+      width: 82%;       /* 横長：バーコード幅に合わせる */
+      height: 60%;      /* 拡大版 */
+      min-height: 72px;
       pointer-events: none;
       /* 枠の外を暗くする（box-shadowで単純に実現） */
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
@@ -913,7 +913,7 @@
         // ── ① BarcodeDetector API（Androidネイティブ・超高速） ──
         if ('BarcodeDetector' in window) {
           const detector = new BarcodeDetector({
-            formats: ['code_128', 'code_39']  // EAN/UPC誤読取防止のため在庫系のみ
+            formats: ['code_128']  // CODE_128のみ
           });
 
           const nativeScanLoop = async () => {
@@ -939,18 +939,17 @@
         } else {
           // ── ② ZXing BrowserMultiFormatReader 連続スキャン（mockupと同じ方式）──
           const hints = new Map();
-          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          // TRY_HARDER は回転試行で遅くなるため外す（CODE_128は横向き固定）
           hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
             ZXing.BarcodeFormat.CODE_128,
-            ZXing.BarcodeFormat.CODE_39,
           ]);
-          // 200ms = 読み取り成功後のクールダウン。エラー時は即リトライ(0ms)
-          codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);
+          // timeBetweenScansMillis=100: 成功後100msクールダウン。失敗時は即リトライ(0ms)
+          codeReader = new ZXing.BrowserMultiFormatReader(hints, 100);
           codeReader.timeBetweenDecodingAttempts = 0;
 
           try {
             await codeReader.decodeFromConstraints(
-              { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 } } },
+              { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
               video,
               (result, err) => {
                 if (!isCameraOn) return;
