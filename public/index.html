@@ -610,6 +610,81 @@
         box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
       }
     }
+
+    /* ========= サブタブ ========= */
+    .sub-tab-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.25s;
+    }
+    .sub-tab-btn.active {
+      background: rgba(59,130,246,0.2);
+      border-color: var(--accent-in);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(59,130,246,0.25);
+    }
+    .sub-tab-panel { display: none; }
+    .sub-tab-panel.active { display: block; }
+
+    /* ========= カテゴリグリッド ========= */
+    .cat-btn {
+      padding: 10px 4px;
+      border-radius:10px;
+      font-size:12px;
+      font-weight:600;
+      text-align:center;
+      cursor:pointer;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);
+      color:var(--text-main);
+      transition:all 0.2s;
+    }
+    .cat-btn:active { transform:scale(0.95); }
+
+    /* ========= 履歴カード ========= */
+    .history-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .history-card .h-time { font-size:10px; color:var(--text-muted); margin-bottom:4px; }
+    .history-card .h-name { font-size:14px; font-weight:600; margin-bottom:6px; }
+    .history-card .h-fields { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+    .history-field {
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .history-field input {
+      background:transparent; border:none; color:#fff;
+      font-size:12px; font-weight:600; width:60px; text-align:right;
+      border-bottom: 1px dashed rgba(255,255,255,0.3);
+      outline:none;
+    }
+    .history-card .h-actions { display:flex; gap:8px; justify-content:flex-end; }
+    .h-save-btn {
+      background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.4);
+      color:#60a5fa; border-radius:7px; padding:4px 10px; font-size:11px; cursor:pointer;
+    }
+    .h-del-btn {
+      background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3);
+      color:var(--accent-defect); border-radius:7px; padding:4px 10px; font-size:11px; cursor:pointer;
+    }
   </style>
 </head>
 
@@ -682,36 +757,44 @@
       <div class="scan-guide">バーコードを枠内に合わせてください</div>
     </div>
 
-    <!-- 静止画スキャン（フォールバック）-->
-    <label class="action-btn" for="camera-scan"
-      style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-assembly); margin-bottom: 10px;">
-      <span class="material-icons-round">add_a_photo</span>
-      カメラで1枚撮影してスキャン
-    </label>
-    <input type="file" id="camera-scan" accept="image/*" capture="environment" style="display:none;"
-      onchange="scanImage(this)">
+    <!-- 静止画・手動入力は削除済み。カメラスキャンのみ使用 -->
 
-    <label class="action-btn" for="file-scan"
-      style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-assembly);">
-      <span class="material-icons-round">add_photo_alternate</span>
-      アルバムから複数選んで一括スキャン
-    </label>
-    <input type="file" id="file-scan" accept="image/*" multiple style="display:none;" onchange="scanImage(this)">
-
-    <!-- Undo Button -->
-    <button class="action-btn" onclick="undo()"
-      style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: var(--accent-defect);">
-      <span class="material-icons-round">undo</span>
-      直前の履歴を完全に取り消す (Undo)
-    </button>
-
-    <input type="text" id="barcodeInput" class="input-box" placeholder="バーコードを手動入力..." autocomplete="off"
-      style="margin-top: 15px;">
-
-    <!-- Status Log -->
+    <!-- ステータス表示 -->
     <div id="status">
       <span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span>
       <span>スキャン待ちです</span>
+    </div>
+
+    <!-- ========= タブナビゲーション ========= -->
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="sub-tab-btn active" id="tabBtnBulk" onclick="switchSubTab('bulk')">
+        <span class="material-icons-round" style="font-size:15px;">category</span>
+        まとめて<span id="tabBulkLabel">入庫</span>
+      </button>
+      <button class="sub-tab-btn" id="tabBtnHistory" onclick="switchSubTab('history')">
+        <span class="material-icons-round" style="font-size:15px;">history</span>
+        <span id="tabHistoryLabel">入庫</span>履歴
+      </button>
+    </div>
+
+    <!-- ========= まとめてパネル ========= -->
+    <div id="tabBulkPanel" class="sub-tab-panel glass-panel" style="padding:14px; margin-top:10px;">
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">カテゴリを選択（品目一覧は順次追加予定）</div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;" id="categoryGrid">
+      </div>
+    </div>
+
+    <!-- ========= 履歴パネル ========= -->
+    <div id="tabHistoryPanel" class="sub-tab-panel glass-panel" style="display:none; padding:14px; margin-top:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:12px; color:var(--text-muted);">直近20件</span>
+        <button onclick="loadHistory()" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; border-radius:8px; padding:4px 10px; font-size:12px; cursor:pointer;">
+          <span class="material-icons-round" style="font-size:13px; vertical-align:middle;">refresh</span> 更新
+        </button>
+      </div>
+      <div id="historyList">
+        <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:13px;">「更新」ボタンを押して履歴を読み込む</div>
+      </div>
     </div>
 
   </div>
@@ -1721,6 +1804,136 @@
       }
       isProcessing = false;
     }
+
+    // ========= サブタブ =========
+    const CATEGORIES = ['CPU','CPUCooler','AIO','RAM','Disk','MB','GPU','Case','ATX','Casefan','追加パーツ'];
+    const CAT_ICONS  = ['memory','ac_unit','water','storage','save','developer_board','videogame_asset','computer','electrical_services','mode_fan','add_box'];
+
+    function initCategoryGrid() {
+      const grid = document.getElementById('categoryGrid');
+      grid.innerHTML = CATEGORIES.map((c, i) => `
+        <button class="cat-btn" onclick="onCategoryClick('${c}')">
+          <span class="material-icons-round" style="font-size:20px;display:block;margin-bottom:3px;">${CAT_ICONS[i]||'category'}</span>
+          ${c}
+        </button>`).join('');
+    }
+
+    function onCategoryClick(cat) {
+      setStatus(`📦 【${cat}】\u2192 品目一覧は順次追加予定`, false);
+    }
+
+    function switchSubTab(tab) {
+      document.getElementById('tabBulkPanel').style.display    = tab === 'bulk'    ? 'block' : 'none';
+      document.getElementById('tabHistoryPanel').style.display = tab === 'history' ? 'block' : 'none';
+      document.getElementById('tabBtnBulk').classList.toggle('active',    tab === 'bulk');
+      document.getElementById('tabBtnHistory').classList.toggle('active',  tab === 'history');
+      if (tab === 'history') loadHistory();
+    }
+
+    // モード変更時にタブラベルも更新
+    const _origSetMode = setMode;
+    function setMode(mode) {
+      _origSetMode(mode);
+      const label = ['組み立て','不良報告'].includes(mode) ? mode : mode;
+      if (document.getElementById('tabBulkLabel'))    document.getElementById('tabBulkLabel').textContent    = mode;
+      if (document.getElementById('tabHistoryLabel')) document.getElementById('tabHistoryLabel').textContent = mode;
+    }
+
+    // ========= 履歴 =========
+    let historyRows    = [];
+    let historyHeaders = [];
+
+    // モード別の「編集可能列」定義（1-indexed）
+    const EDITABLE_COLS = {
+      '入庫':  [{ col:6, label:'入庫数' }, { col:7, label:'仕入単価' }],
+      '出庫':  [{ col:5, label:'数量' }],
+      '棚卸':  [{ col:6, label:'実地数' }],
+      '不良報告': [{ col:4, label:'数量' }],
+      '組み立て': [{ col:5, label:'数量' }],
+    };
+
+    async function loadHistory() {
+      const listEl = document.getElementById('historyList');
+      listEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;">読み込み中...</div>';
+      try {
+        const res = await callAPI('getHistory', { type: currentMode, limit: 20 });
+        if (!res.success) { listEl.innerHTML = `<div style="color:#ef4444;padding:10px;">${res.message}</div>`; return; }
+        historyRows    = res.rows;
+        historyHeaders = res.headers;
+        renderHistory();
+      } catch(e) {
+        listEl.innerHTML = `<div style="color:#ef4444;padding:10px;">通信エラー: ${e.message}</div>`;
+      }
+    }
+
+    function renderHistory() {
+      const listEl = document.getElementById('historyList');
+      if (!historyRows.length) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">データがありません</div>';
+        return;
+      }
+      const editCols = EDITABLE_COLS[currentMode] || [];
+      listEl.innerHTML = historyRows.map((row, ri) => {
+        const d = row.data;
+        const timeTxt = d[0] || '';
+        const catTxt  = d[1] || '';
+        const nameTxt = d[2] || d[0] || '';
+        const codeTxt = d[3] || '';
+
+        const fields = editCols.map(ec => `
+          <div class="history-field">
+            <span>${ec.label}:</span>
+            <input type="number" id="hf_${ri}_${ec.col}" value="${d[ec.col-1]||0}" step="1">
+          </div>`).join('');
+
+        return `
+        <div class="history-card" id="hcard_${ri}">
+          <div class="h-time">${timeTxt}${catTxt ? '　' + catTxt : ''}</div>
+          <div class="h-name">${nameTxt}${codeTxt && codeTxt!==nameTxt ? '<span style="font-size:11px;color:var(--text-muted);margin-left:6px;">['+codeTxt+']</span>' : ''}</div>
+          ${fields ? `<div class="h-fields">${fields}</div>` : ''}
+          <div class="h-actions">
+            ${fields ? `<button class="h-save-btn" onclick="saveHistoryRow(${ri})">💾 保存</button>` : ''}
+            <button class="h-del-btn" onclick="deleteHistoryRowUI(${ri})">🗑 削除</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function saveHistoryRow(ri) {
+      const row      = historyRows[ri];
+      const editCols = EDITABLE_COLS[currentMode] || [];
+      const fields   = {};
+      editCols.forEach(ec => {
+        const el = document.getElementById(`hf_${ri}_${ec.col}`);
+        if (el) fields[String(ec.col)] = Number(el.value);
+      });
+      try {
+        const res = await callAPI('updateHistoryRow', { type: currentMode, rowIndex: row.rowIndex, fields });
+        if (res.success) {
+          // ローカルデータも更新
+          editCols.forEach(ec => { row.data[ec.col-1] = String(fields[String(ec.col)]); });
+          setStatus('✅ 保存しました', false);
+        } else { setStatus('⚠️ ' + res.message, true); }
+      } catch(e) { setStatus('⚠️ 通信エラー: ' + e.message, true); }
+    }
+
+    async function deleteHistoryRowUI(ri) {
+      if (!confirm('この行を削除しますか？')) return;
+      const row = historyRows[ri];
+      try {
+        const res = await callAPI('deleteHistoryRow', { type: currentMode, rowIndex: row.rowIndex });
+        if (res.success) {
+          historyRows.splice(ri, 1);
+          // rowIndexを再調整（削除行より下はrowIndex-1）
+          historyRows.forEach(r => { if (r.rowIndex > row.rowIndex) r.rowIndex--; });
+          renderHistory();
+          setStatus('🗑 削除しました', false);
+        } else { setStatus('⚠️ ' + res.message, true); }
+      } catch(e) { setStatus('⚠️ 通信エラー: ' + e.message, true); }
+    }
+
+    // 起動時にカテゴリグリッドを初期化
+    initCategoryGrid();
 
   </script>
 </body>
