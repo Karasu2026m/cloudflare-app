@@ -175,20 +175,83 @@
       border-radius: 12px;
       overflow: hidden;
       display: none;
+      background: #000;
     }
     #cameraArea video {
       width: 100%;
       display: block;
       border-radius: 12px;
     }
+    /* 暗転マスク（枠の外を暗くする） */
+    #cameraArea .scan-mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      /* 中央の透明窓を切り抜く */
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      padding: 50% 12% 50% 12%; /* 上下50% 左右12% → 中央窓のサイズが変わる */
+      box-sizing: border-box;
+    }
+    /* スキャン枠本体 */
     #cameraArea .scan-overlay {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 70%; height: 30%;
-      border: 2px solid rgba(16, 185, 129, 0.8);
-      border-radius: 8px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.3);
+      width: 76%;       /* 横長：バーコード幅に合わせる */
+      height: 18%;      /* 縦は短め */
+      min-height: 52px;
+      pointer-events: none;
+    }
+    /* 四隅マーカー */
+    #cameraArea .scan-overlay::before,
+    #cameraArea .scan-overlay::after,
+    #cameraArea .scan-corner-br,
+    #cameraArea .scan-corner-bl {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: #10b981;
+      border-style: solid;
+    }
+    #cameraArea .scan-overlay::before { top:0; left:0;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    #cameraArea .scan-overlay::after  { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    #cameraArea .scan-corner-br { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+    #cameraArea .scan-corner-bl { bottom:0; left:0;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    /* スキャンライン */
+    @keyframes scanLine {
+      0%   { top: 4px;   opacity: 1; }
+      90%  { top: calc(100% - 4px); opacity: 1; }
+      100% { top: calc(100% - 4px); opacity: 0; }
+    }
+    #cameraArea .scan-line {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #10b981 20%, #34d399 50%, #10b981 80%, transparent);
+      box-shadow: 0 0 8px #10b981, 0 0 16px rgba(16,185,129,0.5);
+      border-radius: 2px;
+      animation: scanLine 1.6s ease-in-out infinite;
+    }
+    /* ガイドテキスト */
+    #cameraArea .scan-guide {
+      position: absolute;
+      bottom: 10px;
+      left: 0; right: 0;
+      text-align: center;
+      color: rgba(255,255,255,0.75);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     }
     .camera-toggle-btn {
       background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -604,7 +667,13 @@
     </button>
     <div id="cameraArea">
       <video id="cameraVideo" autoplay playsinline muted></video>
-      <div class="scan-overlay"></div>
+      <div class="scan-mask"></div>
+      <div class="scan-overlay">
+        <div class="scan-corner-br"></div>
+        <div class="scan-corner-bl"></div>
+        <div class="scan-line"></div>
+      </div>
+      <div class="scan-guide">バーコードを枠内に合わせてください</div>
     </div>
 
     <!-- 静止画スキャン（フォールバック）-->
@@ -1565,8 +1634,32 @@
       btn.disabled = true;
 
       try {
-        const res = await callAPI('submitBulkCart', { type: currentMode, cart: cart });
-        if (res.success) {
+        const body = { action: 'submitBulkCart', type: currentMode, cart: cart };
+        const fetchRes = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const text = await fetchRes.text();
+        if (!fetchRes.ok) {
+          playBeep('error');
+          setStatus(`⚠️ 送信失敗 HTTP ${fetchRes.status}<br><small>${text.substring(0, 150)}</small>`, true);
+          btn.innerHTML = `<span class="material-icons-round">cloud_upload</span> 確定してデータを送信`;
+          btn.disabled = false;
+          return;
+        }
+
+        let data;
+        try { data = JSON.parse(text); } catch(e) {
+          playBeep('error');
+          setStatus(`⚠️ レスポンス解析エラー<br><small>${text.substring(0, 150)}</small>`, true);
+          btn.innerHTML = `<span class="material-icons-round">cloud_upload</span> 確定してデータを送信`;
+          btn.disabled = false;
+          return;
+        }
+
+        if (data.success) {
           playBeep('complete');
           flashScreen('success');
           setStatus(`✅ 送信完了！<br>${cart.length}種類のデータを処理しました`, false);
@@ -1579,11 +1672,11 @@
           document.getElementById('cartDrawer').classList.remove('open');
         } else {
           playBeep('error');
-          setStatus(`⚠️ ${res.message}`, true);
+          setStatus(`⚠️ ${data.message}`, true);
         }
       } catch(err) {
         playBeep('error');
-        setStatus("⚠️ 通信エラーで送信に失敗しました", true);
+        setStatus(`⚠️ 通信エラー: ${err.message}`, true);
       }
       btn.innerHTML = `<span class="material-icons-round">cloud_upload</span> 確定してデータを送信`;
       btn.disabled = false;
