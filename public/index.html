@@ -1065,6 +1065,12 @@
       document.getElementById('assemblyArea').style.display = (mode === '組み立て') ? 'block' : 'none';
 
       setStatus(`<span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span><br>【${mode}】スキャン待ち`, false);
+
+      // タブラベルも連動して更新
+      const tabBulk = document.getElementById('tabBulkLabel');
+      const tabHist = document.getElementById('tabHistoryLabel');
+      if (tabBulk) tabBulk.textContent = mode;
+      if (tabHist) tabHist.textContent = mode;
     }
 
     /* Cart Logic */
@@ -1830,14 +1836,6 @@
       if (tab === 'history') loadHistory();
     }
 
-    // モード変更時にタブラベルも更新
-    const _origSetMode = setMode;
-    function setMode(mode) {
-      _origSetMode(mode);
-      const label = ['組み立て','不良報告'].includes(mode) ? mode : mode;
-      if (document.getElementById('tabBulkLabel'))    document.getElementById('tabBulkLabel').textContent    = mode;
-      if (document.getElementById('tabHistoryLabel')) document.getElementById('tabHistoryLabel').textContent = mode;
-    }
 
     // ========= 履歴 =========
     let historyRows    = [];
