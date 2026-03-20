@@ -209,9 +209,11 @@
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 76%;       /* 横長：バーコード幅に合わせる */
-      height: 18%;      /* 縦は短め */
-      min-height: 52px;
+      height: 27%;      /* 18% × 1.5倍 */
+      min-height: 54px;
       pointer-events: none;
+      /* 枠の外を暗くする（box-shadowで単純に実現） */
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
     }
     /* 四隅マーカー */
     #cameraArea .scan-overlay::before,
@@ -860,33 +862,34 @@
 
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          let scanning = false;
 
-          const zxingScanLoop = async () => {
+          const zxingScanLoop = () => {
             if (!isCameraOn) return;
-            if (!scanning && video.readyState >= 2) {
-              scanning = true;
-              canvas.width  = video.videoWidth;
-              canvas.height = video.videoHeight;
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const imgData = canvas.toDataURL('image/jpeg', 0.92);
-              try {
-                const result = await reader.decodeFromImageUrl(imgData);
-                if (result) {
-                  const now = Date.now();
-                  if (now - lastScanTime > 1500) {
-                    lastScanTime = now;
-                    playBeep('success');
-                    flashScreen('success');
-                    processBarcodeLocally(result.getText());
-                  }
+            if (video.readyState >= 2) {
+              // 必要ならリサイズ（高解像度カメラが遅いので800px上限）
+              const MAX = 800;
+              let w = video.videoWidth, h = video.videoHeight;
+              if (w > MAX || h > MAX) {
+                const sc = MAX / Math.max(w, h); w = Math.round(w * sc); h = Math.round(h * sc);
+              }
+              canvas.width = w; canvas.height = h;
+              ctx.drawImage(video, 0, 0, w, h);
+              // 同期デコード（URL変換なしで直接canvas処理 → 高速）
+              const code = zxingDecodeCanvas(canvas);
+              if (code) {
+                const now = Date.now();
+                if (now - lastScanTime > 1500) {
+                  lastScanTime = now;
+                  playBeep('success');
+                  flashScreen('success');
+                  processBarcodeLocally(code);
                 }
-              } catch (_) {}
-              scanning = false;
+              }
             }
-            cameraAnimFrame = requestAnimationFrame(zxingScanLoop);
+            // setTimeoutで次フレーム（rAFだと占有筏が高すぎるため）
+            setTimeout(zxingScanLoop, 80); // ~12fps
           };
-          cameraAnimFrame = requestAnimationFrame(zxingScanLoop);
+          setTimeout(zxingScanLoop, 200);
         }
 
       } catch (e) {
