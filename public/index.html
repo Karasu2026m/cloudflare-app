@@ -913,7 +913,7 @@
         // ── ① BarcodeDetector API（Androidネイティブ・超高速） ──
         if ('BarcodeDetector' in window) {
           const detector = new BarcodeDetector({
-            formats: ['code_128', 'code_39', 'qr_code', 'ean_13', 'ean_8', 'itf', 'data_matrix']
+            formats: ['code_128', 'code_39']  // EAN/UPC誤読取防止のため在庫系のみ
           });
 
           const nativeScanLoop = async () => {
@@ -940,6 +940,10 @@
           // ── ② ZXing BrowserMultiFormatReader 連続スキャン（mockupと同じ方式）──
           const hints = new Map();
           hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.CODE_39,
+          ]);
           // 200ms = 読み取り成功後のクールダウン。エラー時は即リトライ(0ms)
           codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);
           codeReader.timeBetweenDecodingAttempts = 0;
