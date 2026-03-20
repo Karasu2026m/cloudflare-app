@@ -728,17 +728,26 @@
         btn.innerHTML = '<span class="material-icons-round">hourglass_top</span> カメラ起動中...';
 
         const hints = new Map();
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128]);
+        // CODE_128に限定せず全形式対応（小さいバーコードも検出しやすくなる）
         hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+        codeReader = new ZXing.BrowserMultiFormatReader(hints, 200); // 200ms間隔でスキャン
 
         area.style.display = 'block';
         isCameraOn = true;
         btn.classList.add('active');
         btn.innerHTML = '<span class="material-icons-round">videocam_off</span> カメラを停止';
 
-        await codeReader.decodeFromVideoDevice(
-          undefined, // デフォルトの背面カメラ
+        // 高解像度・背面カメラを明示的に指定
+        const constraints = {
+          video: {
+            facingMode: { ideal: 'environment' }, // 背面カメラ優先
+            width:  { ideal: 1920 },
+            height: { ideal: 1080 },
+          }
+        };
+
+        await codeReader.decodeFromConstraints(
+          constraints,
           'cameraVideo',
           (result, err) => {
             if (result) {
