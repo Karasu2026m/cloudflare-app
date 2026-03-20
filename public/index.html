@@ -639,9 +639,9 @@
 
     /* ========= カテゴリグリッド ========= */
     .cat-btn {
-      padding: 10px 4px;
-      border-radius:10px;
-      font-size:12px;
+      padding: 6px 4px;
+      border-radius:8px;
+      font-size:11px;
       font-weight:600;
       text-align:center;
       cursor:pointer;
@@ -650,6 +650,7 @@
       color:var(--text-main);
       transition:all 0.2s;
     }
+    .cat-btn.active { background:rgba(16,185,129,0.2); border-color:rgba(16,185,129,0.5); color:#10b981; }
     .cat-btn:active { transform:scale(0.95); }
 
     /* ========= 履歴カード ========= */
@@ -780,7 +781,7 @@
     <!-- ========= まとめてパネル ========= -->
     <div id="tabBulkPanel" class="sub-tab-panel glass-panel" style="padding:14px; margin-top:10px;">
       <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">カテゴリを選択</div>
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;" id="categoryGrid">
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;" id="categoryGrid">
       </div>
       <!-- 品目一覧エリア（カテゴリ選択後に展開） -->
       <div id="categoryItemPanel" style="display:none; margin-top:14px; border-top:1px solid var(--card-border); padding-top:12px;">
@@ -1835,11 +1836,8 @@
 
     function initCategoryGrid() {
       const grid = document.getElementById('categoryGrid');
-      grid.innerHTML = CATEGORIES.map((c, i) => `
-        <button class="cat-btn" onclick="onCategoryClick('${c}')">
-          <span class="material-icons-round" style="font-size:20px;display:block;margin-bottom:3px;">${CAT_ICONS[i]||'category'}</span>
-          ${c}
-        </button>`).join('');
+      grid.innerHTML = CATEGORIES.map(c => `
+        <button class="cat-btn" onclick="onCategoryClick('${c}')">${c}</button>`).join('');
     }
 
     async function onCategoryClick(cat) {
