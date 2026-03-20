@@ -1876,8 +1876,16 @@
             </button>
           </div>`).join('');
       } catch(e) {
-        listEl.innerHTML = `<div style="color:#ef4444;padding:8px;font-size:12px;">❌ 通信エラー: ${e.message}</div>`;
+        const errMsg = e.message || String(e);
+        listEl.innerHTML = `<div style="color:#ef4444;padding:8px;font-size:12px;">❌ 通信エラー: ${errMsg}</div>`;
+        // GASpingでどのアクションが登録されているか確認
+        try {
+          const ping = await callAPI('ping', {});
+          const known = ping.knownActions ? ping.knownActions.join(', ') : '不明';
+          listEl.innerHTML += `<div style="color:#f59e0b;padding:6px;font-size:11px;">GAS認識アクション: ${known}</div>`;
+        } catch(_) {}
       }
+
     }
 
 

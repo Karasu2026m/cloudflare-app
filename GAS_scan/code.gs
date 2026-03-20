@@ -49,8 +49,11 @@ function doPost(e) {
         result = getCategoryItems(json.category);
         break;
       case 'ping':
-        result = { success: true, message: 'pong', timestamp: getFormattedDate() };
+        result = { success: true, message: 'pong', timestamp: getFormattedDate(),
+          knownActions: ['submitBulkCart','getAssemblyOrder','undoLastScan','getHistory',
+                         'updateHistoryRow','deleteHistoryRow','getCategoryItems'] };
         break;
+
       default:
         result = { success: false, message: '不明なアクション: ' + json.action };
     }
