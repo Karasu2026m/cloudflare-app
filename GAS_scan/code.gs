@@ -5,9 +5,9 @@
  */
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
-      .setTitle('📦 在庫スキャンシステム V3')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+  return ContentService.createTextOutput(
+    JSON.stringify({ status: 'ok', message: 'GAS API is running' })
+  ).setMimeType(ContentService.MimeType.JSON);
 }
 
 /**
@@ -35,6 +35,18 @@ function doPost(e) {
         break;
       case 'undoLastScan':
         result = undoLastScan(json.type);
+        break;
+      case 'getHistory':
+        result = getHistory(json.type, json.limit || 20);
+        break;
+      case 'updateHistoryRow':
+        result = updateHistoryRow(json.type, json.rowIndex, json.fields);
+        break;
+      case 'deleteHistoryRow':
+        result = deleteHistoryRow(json.type, json.rowIndex);
+        break;
+      case 'getCategoryItems':
+        result = getCategoryItems(json.category);
         break;
       case 'ping':
         result = { success: true, message: 'pong', timestamp: getFormattedDate() };
@@ -690,3 +702,77 @@ function getAssemblyOrder(assemblyId) {
     }
 }
 
+// ==========================================
+// 履歴取得 / 行編集 / 行削除 API
+// ==========================================
+
+function _getTargetSheet(type) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var nameMap = {
+    '入庫': '入庫_スキャン', '出庫': '出庫_スキャン',
+    '組み立て': '出庫_スキャン', '棚卸': '棚卸', '不良報告': '不良在庫'
+  };
+  var name = nameMap[type] || '';
+  return name ? ss.getSheetByName(name) : null;
+}
+
+function getHistory(type, limit) {
+  try {
+    var sheet = _getTargetSheet(type);
+    if (!sheet) return { success: false, message: 'シートが見つかりません: ' + type };
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, rows: [], headers: [] };
+    var numCols = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, numCols).getValues()[0].map(String);
+    var startRow = Math.max(2, lastRow - (limit || 20) + 1);
+    var values = sheet.getRange(startRow, 1, lastRow - startRow + 1, numCols).getValues();
+    var rows = [];
+    for (var i = values.length - 1; i >= 0; i--) {
+      rows.push({ rowIndex: startRow + i, data: values[i].map(function(v) { return String(v || ''); }) });
+    }
+    return { success: true, rows: rows, headers: headers };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+function updateHistoryRow(type, rowIndex, fields) {
+  try {
+    var sheet = _getTargetSheet(type);
+    if (!sheet) return { success: false, message: 'シートが見つかりません' };
+    for (var col in fields) {
+      sheet.getRange(rowIndex, parseInt(col)).setValue(fields[col]);
+    }
+    return { success: true };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+function deleteHistoryRow(type, rowIndex) {
+  try {
+    var sheet = _getTargetSheet(type);
+    if (!sheet) return { success: false, message: 'シートが見つかりません' };
+    sheet.deleteRow(rowIndex);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+// ==========================================
+// カテゴリ別品目取得 API
+// 商品マスタ_統合: C列=カテゴリ, B列=在庫管理コード, G列=商品名
+// ==========================================
+function getCategoryItems(category) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('商品マスタ_統合');
+    if (!sheet) return { success: false, message: '商品マスタ_統合が見つかりません' };
+    var data = sheet.getDataRange().getValues();
+    var items = [];
+    for (var i = 0; i < data.length; i++) {
+      var cat  = String(data[i][2] || '').trim(); // C列: カテゴリ
+      var name = String(data[i][6] || '').trim(); // G列: 商品名
+      var code = String(data[i][1] || '').trim(); // B列: 在庫管理コード
+      if (cat === category && name && code) {
+        items.push({ name: name, code: code });
+      }
+    }
+    return { success: true, items: items };
+  } catch(e) { return { success: false, message: e.message }; }
+}

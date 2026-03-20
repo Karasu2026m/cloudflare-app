@@ -779,10 +779,19 @@
 
     <!-- ========= まとめてパネル ========= -->
     <div id="tabBulkPanel" class="sub-tab-panel glass-panel" style="padding:14px; margin-top:10px;">
-      <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">カテゴリを選択（品目一覧は順次追加予定）</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">カテゴリを選択</div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;" id="categoryGrid">
       </div>
+      <!-- 品目一覧エリア（カテゴリ選択後に展開） -->
+      <div id="categoryItemPanel" style="display:none; margin-top:14px; border-top:1px solid var(--card-border); padding-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span id="categoryItemTitle" style="font-size:13px; font-weight:600; color:var(--text-main);"></span>
+          <button onclick="document.getElementById('categoryItemPanel').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;">✕</button>
+        </div>
+        <div id="categoryItemList"></div>
+      </div>
     </div>
+
 
     <!-- ========= 履歴パネル ========= -->
     <div id="tabHistoryPanel" class="sub-tab-panel glass-panel" style="display:none; padding:14px; margin-top:10px;">
@@ -1833,9 +1842,46 @@
         </button>`).join('');
     }
 
-    function onCategoryClick(cat) {
-      setStatus(`📦 【${cat}】\u2192 品目一覧は順次追加予定`, false);
+    async function onCategoryClick(cat) {
+      const panel    = document.getElementById('categoryItemPanel');
+      const titleEl  = document.getElementById('categoryItemTitle');
+      const listEl   = document.getElementById('categoryItemList');
+
+      // アクティブなカテゴリボタンのスタイル
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+
+      titleEl.textContent = '📦 ' + cat;
+      listEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">読み込み中...</div>';
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      try {
+        const res = await callAPI('getCategoryItems', { category: cat });
+        if (!res.success) {
+          listEl.innerHTML = `<div style="color:#ef4444;padding:8px;font-size:12px;">❌ ${res.message}</div>`;
+          return;
+        }
+        if (!res.items || res.items.length === 0) {
+          listEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">該当パーツなし</div>';
+          return;
+        }
+        listEl.innerHTML = res.items.map(item => `
+          <div style="display:flex; justify-content:space-between; align-items:center;
+            padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:13px; color:var(--text-main); flex:1; padding-right:8px;">${item.name}</span>
+            <button onclick="addToCart('${item.code.replace(/'/g,"\\'")}','${item.name.replace(/'/g,"\\'")}',1); playBeep('success'); this.textContent='✓ 追加'; setTimeout(()=>this.textContent='+追加',800);"
+              style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);
+                color:#10b981; border-radius:8px; padding:5px 12px; font-size:12px;
+                font-weight:600; cursor:pointer; white-space:nowrap; min-width:56px;">
+              +追加
+            </button>
+          </div>`).join('');
+      } catch(e) {
+        listEl.innerHTML = `<div style="color:#ef4444;padding:8px;font-size:12px;">❌ 通信エラー: ${e.message}</div>`;
+      }
     }
+
 
     function switchSubTab(tab) {
       document.getElementById('tabBulkPanel').style.display    = tab === 'bulk'    ? 'block' : 'none';
