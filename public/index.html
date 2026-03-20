@@ -1186,14 +1186,16 @@
       updateAssemblyListUI();
     }
 
-    // Barcode Processing (Offline to Cart)
+    // Barcode Processing (Offline to Cart) - 手動入力欄は削除済みのためnullセーフに
     const inputEl = document.getElementById('barcodeInput');
-    inputEl.addEventListener('keyup', e => {
-      if (e.key === 'Enter') {
-        processBarcodeLocally(inputEl.value.trim());
-        inputEl.value = '';
-      }
-    });
+    if (inputEl) {
+      inputEl.addEventListener('keyup', e => {
+        if (e.key === 'Enter') {
+          processBarcodeLocally(inputEl.value.trim());
+          inputEl.value = '';
+        }
+      });
+    }
 
     function onScanSuccess(decodedText) {
       processBarcodeLocally(decodedText.trim());
