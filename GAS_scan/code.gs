@@ -798,10 +798,23 @@ function getPartsOrder(orderId) {
     for (var i = 0; i < data.length; i++) {
       if (String(data[i][0] || '').trim() === searchId) {
         // J列(index 9) 〜 AC列(index 28)からパーツ情報を取得
+        // 除外列: T(19), U(20), V(21)
+        var EXCLUDE_COLS  = [19, 20, 21];
+        // 除外ワード（部分一致）
+        var EXCLUDE_WORDS = [
+          'LANケーブル C8 3m', '180Hz', '240Hz', '360Hz',
+          'Microsoft Office 2021 Professional Plus'
+        ];
         var parts = [];
         for (var j = 9; j <= 28; j++) {
+          if (EXCLUDE_COLS.indexOf(j) >= 0) continue;
           var val = String(data[i][j] || '').trim();
-          if (val) parts.push({ name: val, code: val });
+          if (!val) continue;
+          var skip = false;
+          for (var k = 0; k < EXCLUDE_WORDS.length; k++) {
+            if (val.indexOf(EXCLUDE_WORDS[k]) >= 0) { skip = true; break; }
+          }
+          if (!skip) parts.push({ name: val, code: val });
         }
         return { success: true, orderId: searchId, parts: parts };
       }
