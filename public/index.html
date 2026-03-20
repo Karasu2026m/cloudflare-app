@@ -1073,6 +1073,11 @@
       const tabHist = document.getElementById('tabHistoryLabel');
       if (tabBulk) tabBulk.textContent = mode;
       if (tabHist) tabHist.textContent = mode;
+
+      // 履歴タブが開いていれば自動更新
+      const histPanel = document.getElementById('tabHistoryPanel');
+      if (histPanel && histPanel.style.display !== 'none') loadHistory();
+
     }
 
     /* Cart Logic */
@@ -1847,7 +1852,7 @@
 
     // モード別の「編集可能列」定義（1-indexed）
     const EDITABLE_COLS = {
-      '入庫':  [{ col:6, label:'入庫数' }, { col:7, label:'仕入単価' }],
+      '入庫':  [{ col:6, label:'入庫数' }],
       '出庫':  [{ col:5, label:'数量' }],
       '棚卸':  [{ col:6, label:'実地数' }],
       '不良報告': [{ col:4, label:'数量' }],
@@ -1858,7 +1863,7 @@
       const listEl = document.getElementById('historyList');
       listEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;">読み込み中...</div>';
       try {
-        const res = await callAPI('getHistory', { type: currentMode, limit: 20 });
+        const res = await callAPI('getHistory', { type: currentMode, limit: 5 });
         if (!res.success) {
           const msg = res.message || '不明なエラー';
           listEl.innerHTML = `<div style="color:#ef4444;padding:10px;font-size:12px;">❌ ${msg}</div>`;
