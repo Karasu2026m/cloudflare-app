@@ -51,6 +51,9 @@ function doPost(e) {
       case 'getPartsOrder':
         result = getPartsOrder(json.orderId);
         break;
+      case 'completePartsOrder':
+        result = completePartsOrder(json.orderId, json.parts);
+        break;
       case 'ping':
         result = { success: true, message: 'pong', timestamp: getFormattedDate(),
           knownActions: ['submitBulkCart','getAssemblyOrder','undoLastScan','getHistory',
@@ -820,5 +823,28 @@ function getPartsOrder(orderId) {
       }
     }
     return { success: false, message: '発注番号 [' + searchId + '] が見つかりません' };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+// ==========================================
+// パーツ集め完了 → 出庫_スキャンシートに記録
+// 列: 出荷日, カテゴリ, 商品コード, 数量, 空白, 注文番号
+// ==========================================
+function completePartsOrder(orderId, parts) {
+  try {
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('出庫_スキャン');
+    if (!sheet) return { success: false, message: '「出庫_スキャン」シートが見つかりません' };
+    var today = getFormattedDate();
+    var rows  = [];
+    for (var i = 0; i < parts.length; i++) {
+      // 出荷日, カテゴリ(空白), 商品コード, 数量, 空白, 注文番号
+      rows.push([today, '', parts[i].code, 1, '', orderId]);
+    }
+    if (rows.length) {
+      var lastRow = sheet.getLastRow() + 1;
+      sheet.getRange(lastRow, 1, rows.length, 6).setValues(rows);
+    }
+    return { success: true, count: rows.length };
   } catch(e) { return { success: false, message: e.message }; }
 }

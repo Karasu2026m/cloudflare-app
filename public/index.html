@@ -808,7 +808,7 @@
 
   <div class="glass-panel" id="mainCard">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">Fushicho Inventory V4</h2>
+      <h2 style="margin:0;">入出庫管理システム</h2>
       <button onclick="toggleAdminMode()" id="adminToggleBtn"
         style="background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); color:var(--accent-defect); border-radius:8px; padding:4px 8px; font-size:11px; cursor:pointer;">
         管理者モードON
@@ -817,20 +817,20 @@
 
     <div class="nav-scroller">
       <div class="toggle-container">
-        <div id="btnIn" class="toggle-btn active in" onclick="setMode('入庫')">
-          <span class="material-icons-round" style="font-size:18px;">download</span>入庫
-        </div>
         <div id="btnAssembly" class="toggle-btn" onclick="setMode('組み立て')">
           <span class="material-icons-round" style="font-size:18px;">inventory</span>パーツ集め
+        </div>
+        <div id="btnIn" class="toggle-btn active in" onclick="setMode('入庫')">
+          <span class="material-icons-round" style="font-size:18px;">download</span>入庫
         </div>
         <div id="btnOut" class="toggle-btn" onclick="setMode('出庫')">
           <span class="material-icons-round" style="font-size:18px;">upload</span>出庫
         </div>
-        <div id="btnAudit" class="toggle-btn" onclick="setMode('棚卸')">
-          <span class="material-icons-round" style="font-size:18px;">fact_check</span>棚卸
-        </div>
         <div id="btnDefect" class="toggle-btn" onclick="setMode('不良報告')">
           <span class="material-icons-round" style="font-size:18px;">warning</span>不良報告
+        </div>
+        <div id="btnAudit" class="toggle-btn" onclick="setMode('棚卸')">
+          <span class="material-icons-round" style="font-size:18px;">fact_check</span>棚卸
         </div>
       </div>
     </div>
@@ -2003,6 +2003,18 @@
     async function completePartsCollection() {
       const input = document.getElementById('assemblyIdInput').value.trim();
       if (!partsChecklist.every(p => p.checked)) return;
+      setStatus('⏳ 出庫履歴に記録中...', false);
+      try {
+        const res = await callAPI('completePartsOrder', {
+          orderId: input,
+          parts: partsChecklist.map(p => ({ name: p.name, code: p.code }))
+        });
+        if (!res.success) { playBeep('error'); setStatus('⚠️ ' + res.message, true); return; }
+      } catch(e) {
+        playBeep('error');
+        setStatus('⚠️ 記録エラー: ' + e.message, true);
+        return;
+      }
       playBeep('complete');
       flashScreen('success');
       setStatus(`🎉 パーツ集め完了！ [${input}]`, false);
