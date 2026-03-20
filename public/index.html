@@ -1959,7 +1959,7 @@
     async function loadPartsOrder() {
       const input = document.getElementById('assemblyIdInput').value.trim();
       if (!input || input === '#') { setStatus('⚠️ 発注番号を入力してください', true); return; }
-      setStatus('⏳ 発注書読み込み中...', false);
+      setStatus('⏳ 指示書読み込み中...', false);
       partsChecklist = [];
       renderPartsChecklist();
       try {
