@@ -1177,9 +1177,13 @@
     }
 
     function setMode(mode) {
+      // カメラが開いていれば先に閉じる
+      if (isCameraOn) toggleCamera();
+
       if (cart.length > 0) {
         if (!confirm("カートにデータが残っています。モードを切り替えるとカートは空になります。よろしいですか？")) return;
       }
+
 
       currentMode = mode;
       cart = [];
@@ -1965,6 +1969,23 @@
     async function loadPartsOrder() {
       const input = document.getElementById('assemblyIdInput').value.trim();
       if (!input || input === '#') { setStatus('⚠️ 発注番号を入力してください', true); return; }
+
+      // 管理者モードバイパス: 指示書なしで出庫ボタンのみ表示
+      if (adminMode) {
+        partsChecklist = []; // 空のまま → every() = true → 完了ボタン有効
+        const listArea = document.getElementById('partsListArea');
+        const listEl   = document.getElementById('assemblyPartsList');
+        const btn      = document.getElementById('partsCompleteBtn');
+        if (listArea) listArea.style.display = 'block';
+        if (listEl) listEl.innerHTML =
+          '<div style="text-align:center; padding:16px; color:var(--accent-assembly); font-size:13px;">' +
+          '🔓 管理者モード：指示書確認をスキップして出庫します<br>' +
+          '<span style="font-size:11px; color:var(--text-muted);">注文 [' + input + ']</span></div>';
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-round">local_shipping</span> 出庫する'; }
+        setStatus('🔓 管理者モード: [' + input + '] 出庫準備完了', false);
+        return;
+      }
+
       setStatus('⏳ 指示書読み込み中...', false);
       partsChecklist = [];
       renderPartsChecklist();
@@ -1979,6 +2000,7 @@
         setStatus('⚠️ 通信エラー: ' + e.message, true);
       }
     }
+
 
     function renderPartsChecklist() {
       const listEl   = document.getElementById('assemblyPartsList');
