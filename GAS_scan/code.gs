@@ -48,6 +48,9 @@ function doPost(e) {
       case 'getCategoryItems':
         result = getCategoryItems(json.category);
         break;
+      case 'getPartsOrder':
+        result = getPartsOrder(json.orderId);
+        break;
       case 'ping':
         result = { success: true, message: 'pong', timestamp: getFormattedDate(),
           knownActions: ['submitBulkCart','getAssemblyOrder','undoLastScan','getHistory',
@@ -777,5 +780,32 @@ function getCategoryItems(category) {
       }
     }
     return { success: true, items: items };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+// ==========================================
+// 発注一覧からパーツ集めリスト取得
+// 内部の別スプレッドシート（発注一覧）のA列＝発注ID, J列～AC列＝パーツ情報
+// ==========================================
+function getPartsOrder(orderId) {
+  try {
+    var PARTS_SS_ID = '16kXJ4OWf66jXdBsBPhTl-wOEh-Q84oyU-j6r3bEV5ns';
+    var ss = SpreadsheetApp.openById(PARTS_SS_ID);
+    var sheet = ss.getSheetByName('発注一覧');
+    if (!sheet) return { success: false, message: '「発注一覧」シートが見つかりません' };
+    var data = sheet.getDataRange().getValues();
+    var searchId = String(orderId || '').trim();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0] || '').trim() === searchId) {
+        // J列(index 9) 〜 AC列(index 28)からパーツ情報を取得
+        var parts = [];
+        for (var j = 9; j <= 28; j++) {
+          var val = String(data[i][j] || '').trim();
+          if (val) parts.push({ name: val, code: val });
+        }
+        return { success: true, orderId: searchId, parts: parts };
+      }
+    }
+    return { success: false, message: '発注番号 [' + searchId + '] が見つかりません' };
   } catch(e) { return { success: false, message: e.message }; }
 }
