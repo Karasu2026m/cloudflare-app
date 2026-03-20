@@ -1859,12 +1859,20 @@
       listEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;">読み込み中...</div>';
       try {
         const res = await callAPI('getHistory', { type: currentMode, limit: 20 });
-        if (!res.success) { listEl.innerHTML = `<div style="color:#ef4444;padding:10px;">${res.message}</div>`; return; }
-        historyRows    = res.rows;
-        historyHeaders = res.headers;
+        if (!res.success) {
+          const msg = res.message || '不明なエラー';
+          listEl.innerHTML = `<div style="color:#ef4444;padding:10px;font-size:12px;">❌ ${msg}</div>`;
+          setStatus('❌ 履歴取得失敗: ' + msg, true);
+          return;
+        }
+        historyRows    = res.rows    || [];
+        historyHeaders = res.headers || [];
         renderHistory();
+        if (!historyRows.length) setStatus('ℹ️ 【' + currentMode + '】の履歴がありません', false);
       } catch(e) {
-        listEl.innerHTML = `<div style="color:#ef4444;padding:10px;">通信エラー: ${e.message}</div>`;
+        const msg = '通信エラー: ' + e.message;
+        listEl.innerHTML = `<div style="color:#ef4444;padding:10px;font-size:12px;">❌ ${msg}</div>`;
+        setStatus('❌ ' + msg, true);
       }
     }
 
