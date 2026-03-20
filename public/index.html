@@ -835,30 +835,17 @@
       </div>
     </div>
 
-    <!-- パーツ集めエリア -->
-    <div id="assemblyArea" class="glass-panel" style="display:none; padding: 15px;">
-      <div style="font-size: 13px; color: var(--accent-assembly); font-weight: bold; margin-bottom: 8px;">
-        📦 パーツ集め ― 発注番号から読み込み
+    <!-- パーツ集め 入力エリア（カメラの上） -->
+    <div id="assemblyArea" class="glass-panel" style="display:none; padding:10px 14px;">
+      <div style="font-size:12px; color:var(--accent-assembly); font-weight:bold; margin-bottom:6px;">
+        📦 指示書番号を入力
       </div>
-      <div style="display:flex; gap:10px;">
-        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0;" value="#" placeholder="#PC-001..."
-          autocomplete="off">
-        <button class="action-btn" style="width:auto; margin:0;" onclick="loadPartsOrder()">読込</button>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0; font-size:14px;" value="#" placeholder="#PC-001..." autocomplete="off">
+        <button class="action-btn" style="width:auto; margin:0; padding:0 14px;" onclick="loadPartsOrder()">読込</button>
       </div>
-      <div id="assemblyMemo"
-        style="margin-top:10px; font-size:12px; color:var(--text-out); background:rgba(245, 158, 11, 0.1); padding:8px; border-radius:8px; display:none;">
-      </div>
-      <div class="parts-list" id="assemblyPartsList">
-        <div style="text-align:center; color: var(--text-muted); font-size: 13px; padding: 10px;">番号を入力して「読込」を押してください
-        </div>
-      </div>
-      <button id="partsCompleteBtn" onclick="completePartsCollection()" disabled
-        style="width:100%; margin-top:12px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);
-          color:#10b981; border-radius:12px; padding:14px; font-size:15px; font-weight:700; cursor:pointer;
-          display:flex; align-items:center; justify-content:center; gap:8px;">
-        <span class="material-icons-round">task_alt</span> パーツ集め完了
-      </button>
     </div>
+
 
     <!-- リアルタイムカメラスキャン -->
     <button class="camera-toggle-btn" id="cameraToggleBtn" onclick="toggleCamera()">
@@ -882,6 +869,22 @@
     <div id="status">
       <span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span>
       <span>スキャン待ちです</span>
+    </div>
+
+    <!-- 指示書リスト（パーツ集めモードのみ・スクロール可能） -->
+    <div id="partsListArea" style="display:none; margin-top:10px;">
+      <div style="font-size:11px; color:var(--accent-assembly); font-weight:600; margin-bottom:4px; letter-spacing:.5px;">📋 指示書</div>
+      <div id="assemblyPartsList"
+        style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08);
+          border-radius:10px; max-height:230px; overflow-y:auto;">
+        <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:14px;">指示書を読み込んでください</div>
+      </div>
+      <button id="partsCompleteBtn" onclick="completePartsCollection()" disabled
+        style="width:100%; margin-top:8px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);
+          color:#10b981; border-radius:10px; padding:12px; font-size:14px; font-weight:700; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; gap:8px;">
+        <span class="material-icons-round">task_alt</span> パーツ集め完了
+      </button>
     </div>
 
     <!-- ========= タブナビゲーション（パーツ集め以外のモードのみ表示） ========= -->
@@ -1199,10 +1202,13 @@
 
       // サブタブ・フローティングボタン → パーツ集めモードでは非表示
       const isAssembly = mode === '組み立て';
-      const subTabArea = document.getElementById('subTabArea');
-      const floatBtn   = document.querySelector('.floating-cart-btn');
+      const subTabArea  = document.getElementById('subTabArea');
+      const floatBtn    = document.querySelector('.floating-cart-btn');
+      const listArea    = document.getElementById('partsListArea');
       if (subTabArea) subTabArea.style.display = isAssembly ? 'none' : 'block';
       if (floatBtn)   floatBtn.style.display   = isAssembly ? 'none' : 'flex';
+      if (listArea && !isAssembly) listArea.style.display = 'none'; // 模ード切替時に非表示
+      if (isAssembly) { partsChecklist = []; renderPartsChecklist(); } // リセット
 
       setStatus(`<span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span><br>【${mode}】スキャン待ち`, false);
 
@@ -1967,7 +1973,7 @@
         if (!res.success) { playBeep('error'); setStatus('⚠️ ' + res.message, true); return; }
         partsChecklist = (res.parts || []).map(p => ({ ...p, checked: false }));
         renderPartsChecklist();
-        setStatus(`✅ 発注書 [${input}] 読込完了 ― ${partsChecklist.length}件`, false);
+        setStatus(`✅ 指示書 [${input}] 読込完了 ― ${partsChecklist.length}件`, false);
       } catch(e) {
         playBeep('error');
         setStatus('⚠️ 通信エラー: ' + e.message, true);
@@ -1975,22 +1981,22 @@
     }
 
     function renderPartsChecklist() {
-      const listEl = document.getElementById('assemblyPartsList');
-      const btn    = document.getElementById('partsCompleteBtn');
+      const listEl   = document.getElementById('assemblyPartsList');
+      const btn      = document.getElementById('partsCompleteBtn');
+      const listArea = document.getElementById('partsListArea');
       if (!partsChecklist.length) {
-        listEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:10px;">番号を入力して「読込」を押してください</div>';
-        if (btn) btn.disabled = true;
+        if (listArea) listArea.style.display = 'none';
         return;
       }
+      if (listArea) listArea.style.display = 'block';
       const allDone = partsChecklist.every(p => p.checked);
       if (btn) btn.disabled = !allDone;
-      listEl.innerHTML = partsChecklist.map((p, i) => `
-        <div style="display:flex; align-items:center; gap:10px; padding:9px 6px;
-          border-bottom:1px solid rgba(255,255,255,0.06);
-          ${p.checked ? 'opacity:0.45;' : ''}">
-          <span style="font-size:20px;">${p.checked ? '✅' : '⬜'}</span>
-          <span style="flex:1; font-size:13px; ${p.checked ? 'text-decoration:line-through; color:var(--text-muted);' : 'color:var(--text-main);'}">${p.name}</span>
-          <span style="font-size:10px; color:var(--text-muted);">${p.code !== p.name ? p.code : ''}</span>
+      listEl.innerHTML = partsChecklist.map(p => `
+        <div style="display:flex; align-items:center; padding:5px 10px;
+          border-bottom:1px solid rgba(255,255,255,0.05);
+          ${p.checked ? 'opacity:0.4;' : ''}">
+          <span style="flex:1; font-size:11px; ${p.checked ? 'text-decoration:line-through; color:var(--text-muted);' : 'color:var(--text-main);'}">${p.name}</span>
+          <span style="font-size:16px; margin-left:8px;">${p.checked ? '\u2705' : '\u2610'}</span>
         </div>`).join('');
     }
 
