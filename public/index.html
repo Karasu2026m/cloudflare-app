@@ -684,7 +684,10 @@
     let currentMode = '入庫';
     let isProcessing = false;
     let isCameraOn = false;
-    let codeReader = null; // ZXing BrowserMultiFormatReader
+    let codeReader = null;       // ZXing(フォールバック用)
+    let cameraStream = null;     // MediaStream
+    let cameraAnimFrame = null;  // requestAnimationFrame ID
+    let lastScanTime = 0;        // 連続誤検知防止
 
     // V4 State
     let cart = []; // [{code: 'A', name: 'Product A', qty: 1}, ...]
@@ -708,60 +711,115 @@
     }
 
     /**
-     * リアルタイムカメラスキャン（ZXing BrowserMultiFormatReader）
+     * リアルタイムカメラスキャン
+     * 優先順位: ① BarcodeDetector API（ネイティブ・超高速）
+     *           ② ZXing + Canvas手動フレーム送信（フォールバック）
      */
     async function toggleCamera() {
       const btn = document.getElementById('cameraToggleBtn');
       const area = document.getElementById('cameraArea');
+      const video = document.getElementById('cameraVideo');
 
       if (isCameraOn) {
-        // カメラ停止
-        if (codeReader) { codeReader.reset(); codeReader = null; }
+        // ── カメラ停止 ──
+        isCameraOn = false;
+        if (cameraAnimFrame) { cancelAnimationFrame(cameraAnimFrame); cameraAnimFrame = null; }
+        if (codeReader)      { codeReader.reset(); codeReader = null; }
+        if (cameraStream)    { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+        video.srcObject = null;
         area.style.display = 'none';
         btn.classList.remove('active');
         btn.innerHTML = '<span class="material-icons-round">videocam</span> リアルタイムカメラスキャン';
-        isCameraOn = false;
         return;
       }
 
       try {
         btn.innerHTML = '<span class="material-icons-round">hourglass_top</span> カメラ起動中...';
 
-        const hints = new Map();
-        // CODE_128に限定せず全形式対応（小さいバーコードも検出しやすくなる）
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-        codeReader = new ZXing.BrowserMultiFormatReader(hints, 200); // 200ms間隔でスキャン
+        // ── カメラストリーム取得（最高解像度・背面カメラ） ──
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width:  { ideal: 3840, min: 1280 },
+            height: { ideal: 2160, min: 720 },
+          }
+        });
+        video.srcObject = cameraStream;
+        await video.play();
 
         area.style.display = 'block';
         isCameraOn = true;
         btn.classList.add('active');
         btn.innerHTML = '<span class="material-icons-round">videocam_off</span> カメラを停止';
 
-        // 高解像度・背面カメラを明示的に指定
-        const constraints = {
-          video: {
-            facingMode: { ideal: 'environment' }, // 背面カメラ優先
-            width:  { ideal: 1920 },
-            height: { ideal: 1080 },
-          }
-        };
+        // ── ① BarcodeDetector API（Androidネイティブ・超高速） ──
+        if ('BarcodeDetector' in window) {
+          const detector = new BarcodeDetector({
+            formats: ['code_128', 'code_39', 'qr_code', 'ean_13', 'ean_8', 'itf', 'data_matrix']
+          });
 
-        await codeReader.decodeFromConstraints(
-          constraints,
-          'cameraVideo',
-          (result, err) => {
-            if (result) {
-              const code = result.getText();
-              playBeep('success');
-              flashScreen('success');
-              processBarcodeLocally(code);
+          const nativeScanLoop = async () => {
+            if (!isCameraOn) return;
+            if (video.readyState >= 2) {
+              try {
+                const barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                  const now = Date.now();
+                  if (now - lastScanTime > 1500) { // 1.5秒は同じコードを無視
+                    lastScanTime = now;
+                    playBeep('success');
+                    flashScreen('success');
+                    processBarcodeLocally(barcodes[0].rawValue);
+                  }
+                }
+              } catch (_) {}
             }
-            // err は NotFoundException 等（バーコード未検出時）なので無視
-          }
-        );
+            cameraAnimFrame = requestAnimationFrame(nativeScanLoop);
+          };
+          cameraAnimFrame = requestAnimationFrame(nativeScanLoop);
+
+        } else {
+          // ── ② ZXing + Canvasフレーム手動送信（iOS / 非対応環境） ──
+          const hints = new Map();
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          const reader = new ZXing.BrowserMultiFormatReader(hints);
+          codeReader = reader;
+
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          let scanning = false;
+
+          const zxingScanLoop = async () => {
+            if (!isCameraOn) return;
+            if (!scanning && video.readyState >= 2) {
+              scanning = true;
+              canvas.width  = video.videoWidth;
+              canvas.height = video.videoHeight;
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imgData = canvas.toDataURL('image/jpeg', 0.92);
+              try {
+                const result = await reader.decodeFromImageUrl(imgData);
+                if (result) {
+                  const now = Date.now();
+                  if (now - lastScanTime > 1500) {
+                    lastScanTime = now;
+                    playBeep('success');
+                    flashScreen('success');
+                    processBarcodeLocally(result.getText());
+                  }
+                }
+              } catch (_) {}
+              scanning = false;
+            }
+            cameraAnimFrame = requestAnimationFrame(zxingScanLoop);
+          };
+          cameraAnimFrame = requestAnimationFrame(zxingScanLoop);
+        }
+
       } catch (e) {
         playBeep('error');
         setStatus(`❌ カメラ起動失敗: ${e.message}`, true);
+        if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
         area.style.display = 'none';
         btn.classList.remove('active');
         btn.innerHTML = '<span class="material-icons-round">videocam</span> リアルタイムカメラスキャン';
