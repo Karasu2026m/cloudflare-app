@@ -209,8 +209,8 @@
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 76%;       /* 横長：バーコード幅に合わせる */
-      height: 27%;      /* 18% × 1.5倍 */
-      min-height: 54px;
+      height: 40%;      /* 27% × 1.5倍 */
+      min-height: 64px;
       pointer-events: none;
       /* 枠の外を暗くする（box-shadowで単純に実現） */
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
@@ -898,8 +898,8 @@
         cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: 'environment' },
-            width:  { ideal: 3840, min: 1280 },
-            height: { ideal: 2160, min: 720 },
+            width:  { ideal: 1920, min: 1280 },  // 4K→1920: BarcodeDetector処理速度改善
+            height: { ideal: 1080, min: 720 },
           }
         });
         video.srcObject = cameraStream;
