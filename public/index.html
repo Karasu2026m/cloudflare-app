@@ -937,42 +937,41 @@
           cameraAnimFrame = requestAnimationFrame(nativeScanLoop);
 
         } else {
-          // ── ② ZXing + Canvasフレーム手動送信（iOS / 非対応環境） ──
+          // ── ② ZXing BrowserMultiFormatReader 連続スキャン（mockupと同じ方式）──
           const hints = new Map();
           hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-          const reader = new ZXing.BrowserMultiFormatReader(hints);
-          codeReader = reader;
+          // 200ms = 読み取り成功後のクールダウン。エラー時は即リトライ(0ms)
+          codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);
+          codeReader.timeBetweenDecodingAttempts = 0;
 
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-
-          const zxingScanLoop = () => {
-            if (!isCameraOn) return;
-            if (video.readyState >= 2) {
-              // 必要ならリサイズ（高解像度カメラが遅いので800px上限）
-              const MAX = 800;
-              let w = video.videoWidth, h = video.videoHeight;
-              if (w > MAX || h > MAX) {
-                const sc = MAX / Math.max(w, h); w = Math.round(w * sc); h = Math.round(h * sc);
-              }
-              canvas.width = w; canvas.height = h;
-              ctx.drawImage(video, 0, 0, w, h);
-              // 同期デコード（URL変換なしで直接canvas処理 → 高速）
-              const code = zxingDecodeCanvas(canvas);
-              if (code) {
-                const now = Date.now();
-                if (now - lastScanTime > 1500) {
-                  lastScanTime = now;
-                  playBeep('success');
-                  flashScreen('success');
-                  processBarcodeLocally(code);
+          try {
+            await codeReader.decodeFromConstraints(
+              { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 } } },
+              video,
+              (result, err) => {
+                if (!isCameraOn) return;
+                if (result) {
+                  const now = Date.now();
+                  if (now - lastScanTime > 1500) {
+                    lastScanTime = now;
+                    playBeep('success');
+                    flashScreen('success');
+                    processBarcodeLocally(result.getText());
+                  }
                 }
               }
+            );
+            // decodeFromConstraints resolves when video is ready → update UI
+            btn.innerHTML = '<span class="material-icons-round">stop_circle</span> スキャン停止';
+          } catch(zxErr) {
+            if (isCameraOn) { // 意図的停止以外のエラー
+              setStatus(`❌ ZXingエラー: ${zxErr.message}`, true);
+              isCameraOn = false;
+              area.style.display = 'none';
+              btn.classList.remove('active');
+              btn.innerHTML = '<span class="material-icons-round">videocam</span> リアルタイムカメラスキャン';
             }
-            // setTimeoutで次フレーム（rAFだと占有筏が高すぎるため）
-            setTimeout(zxingScanLoop, 80); // ~12fps
-          };
-          setTimeout(zxingScanLoop, 200);
+          }
         }
 
       } catch (e) {
