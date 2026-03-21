@@ -1745,22 +1745,27 @@
           setStatus('⚠️ 先に発注書を読み込んでください', true);
           return;
         }
-        const idx = partsChecklist.findIndex(p => p.code === code || p.name === code);
-        if (idx >= 0) {
-          if (partsChecklist[idx].checked) {
-            setStatus('⚠️ すでにチェック済み: ' + partsChecklist[idx].name, true);
-            return;
-          }
-          partsChecklist[idx].checked = true;
+        // 未チェックの一致を優先して探す（重複パーツ対応）
+        const uncheckedIdx = partsChecklist.findIndex(p => (p.code === code || p.name === code) && !p.checked);
+        if (uncheckedIdx >= 0) {
+          partsChecklist[uncheckedIdx].checked = true;
           renderPartsChecklist();
           playBeep('success');
           flashScreen('success');
-          setStatus('✅ チェック！<br>[' + partsChecklist[idx].name + ']', false);
+          setStatus('✅ チェック！<br>[' + partsChecklist[uncheckedIdx].name + ']', false);
         } else {
-          playBeep('error');
-          flashScreen('error');
-          setStatus('⚠️ リストにないパーツです！<br>[' + code + ']', true);
+          // 同コードが存在するが全てチェック済み → 数量オーバー警告
+          const anyIdx = partsChecklist.findIndex(p => p.code === code || p.name === code);
+          if (anyIdx >= 0) {
+            playBeep('error');
+            setStatus('⚠️ このパーツは必要数スキャン済みです<br>[' + partsChecklist[anyIdx].name + ']', true);
+          } else {
+            playBeep('error');
+            flashScreen('error');
+            setStatus('⚠️ リストにないパーツです！<br>[' + code + ']', true);
+          }
         }
+
         return;
       }
 
