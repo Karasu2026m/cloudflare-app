@@ -559,8 +559,8 @@ function submitBulkCart(type, cartArray) {
                  }
              }
              
-             // 不良在庫シートの構成: スキャン時間, カテゴリ, 商品名, 数量, 不良内容
-             newRows.push([nowText, category, productName, qty, defectDesc]);
+             // 不良在庫シートの構成: スキャン時間, カテゴリ, 商品名, 数量, 不良選択, 備考
+             newRows.push([nowText, category, productName, qty, reason, memoText]);
         } else if (type === '検証報告') {
              let verifyResult = cartArray[i].verifyResult || '新品在庫';
              let verifyMemo   = cartArray[i].verifyMemo   || '';
