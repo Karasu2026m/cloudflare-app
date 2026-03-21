@@ -414,8 +414,8 @@ function submitBulkCart(type, cartArray) {
         // 棚卸だけは自動生成
         if (type === '棚卸') {
             targetSheet = ss.insertSheet('棚卸');
-            targetSheet.getRange("A1:G1").setValues([["🎯 スキャン(コード)", "日付", "カテゴリ", "商品名", "システム在庫", "実地の棚卸数", "誤差(過不足)"]]);
-            targetSheet.getRange("A1:G1").setBackground("#e1bee7").setFontWeight("bold");
+            targetSheet.getRange("A1:E1").setValues([["日付", "カテゴリ", "商品コード", "数量(差分)", "備考"]]);
+            targetSheet.getRange("A1:E1").setBackground("#e1bee7").setFontWeight("bold");
         } else {
             return { success: false, message: "対象シートが見つかりません" };
         }
@@ -521,8 +521,10 @@ function submitBulkCart(type, cartArray) {
             let memo = (type === '組み立て') ? '組み立て出庫' : '';
             newRows.push([nowText, category, productName, finalCode, qty, '正常', memo]);
         } else if (type === '棚卸') {
-            // スキャン(コード), 日付, カテゴリ, 商品名, システム在庫, 実地の棚卸数, 誤差(過不足)
-            newRows.push([finalCode, nowText, category, productName, systemQty, qty, qty - systemQty]);
+            let auditMemo = cartArray[i].auditMemo || '';
+            let diff = qty - systemQty;
+            // 日付, カテゴリ, 商品コード, 数量(差分), 備考
+            newRows.push([dateOnly, category, finalCode, diff, auditMemo]);
         } else if (type === '不良報告') {
              // カートUIでの入力項目を取得
              let reason = cartArray[i].defectReason || '初期不良';

@@ -1275,12 +1275,18 @@
           `;
         } else if (currentMode === '棚卸') {
           extraInput = `
-            <div style="margin-top: 6px;">
-              <label style="font-size:11px; color:var(--text-muted); display:inline-block; margin-bottom:4px;">実地数(カウントした数):</label>
-              <input type="number" class="input-box" style="margin:0; padding: 6px 12px; font-size:14px; background: rgba(0,0,0,0.2);" 
-                placeholder="数量を入力" 
-                value="${item.qty}" 
-                onchange="cart[${index}].qty = Math.max(1, parseInt(this.value)||1); renderCart();">
+            <div style="margin-top: 6px; display:flex; flex-direction:column; gap:6px;">
+              <div>
+                <label style="font-size:11px; color:var(--text-muted); display:inline-block; margin-bottom:4px;">実地数(カウントした数):</label>
+                <input type="number" class="input-box" style="margin:0; padding: 6px 12px; font-size:14px; background: rgba(0,0,0,0.2);"
+                  placeholder="数量を入力"
+                  value="${item.qty}"
+                  onchange="cart[${index}].qty = Math.max(0, parseInt(this.value)||0); renderCart();">
+              </div>
+              <input type="text" class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);"
+                placeholder="備考(任意)"
+                value="${item.auditMemo || ''}"
+                onchange="cart[${index}].auditMemo = this.value">
             </div>
           `;
         } else if (currentMode === '不良報告') {
