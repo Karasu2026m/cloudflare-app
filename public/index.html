@@ -1800,11 +1800,13 @@
           assemblyValidationDisabled = false;
           cart = [];
           const memoEl = document.getElementById('assemblyMemo');
-          if (res.memo) {
-            memoEl.innerText = "📝 備考: " + res.memo;
-            memoEl.style.display = "block";
-          } else {
-            memoEl.style.display = "none";
+          if (memoEl) {
+            if (res.memo) {
+              memoEl.innerText = "📝 備考: " + res.memo;
+              memoEl.style.display = "block";
+            } else {
+              memoEl.style.display = "none";
+            }
           }
           updateAssemblyListUI();
           setStatus(`✅ 指示書 [${input}] 読込完了`, false);
@@ -1943,7 +1945,8 @@
           assemblyValidationDisabled = false;
           document.getElementById('assemblyPartsList').innerHTML = '<div style="text-align:center; color: var(--text-muted); font-size: 13px; padding: 10px;">完了しました。<br>次の番号を入力してください。</div>';
           document.getElementById('assemblyIdInput').value = '#';
-          document.getElementById('assemblyMemo').style.display = 'none';
+          const memoEl2 = document.getElementById('assemblyMemo');
+          if (memoEl2) memoEl2.style.display = 'none';
           renderCart();
           document.getElementById('cartDrawer').classList.remove('open');
         } else {

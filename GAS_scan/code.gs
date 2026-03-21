@@ -563,9 +563,8 @@ function submitBulkCart(type, cartArray) {
         } else if (type === '検証報告') {
              let verifyResult = cartArray[i].verifyResult || '新品在庫';
              let verifyMemo   = cartArray[i].verifyMemo   || '';
-             let verifyDesc   = verifyResult + (verifyMemo ? ' - ' + verifyMemo : '');
-             // 不良在庫と同じ構成: スキャン時間, カテゴリ, 商品名, 数量, 検証結果
-             newRows.push([nowText, category, productName, qty, verifyDesc]);
+             // 日付, カテゴリ, 商品コード, 数量, 分類, 備考
+             newRows.push([nowText, category, finalCode, qty, verifyResult, verifyMemo]);
         }
     }
     
@@ -725,7 +724,7 @@ function _getTargetSheet(type) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var nameMap = {
     '入庫': '入庫_スキャン', '出庫': '出庫_スキャン',
-    '組み立て': '出庫_スキャン', '棚卸': '棚卸', '不良報告': '不良在庫', '検証報告': '不良在庫検証'
+    '組み立て': '出庫_スキャン', '棚卸': '棚卸', '不良報告': '不良在庫', '検証報告': '不良在庫検証結果'
   };
   var name = nameMap[type] || '';
   return name ? ss.getSheetByName(name) : null;
