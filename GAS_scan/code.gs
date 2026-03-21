@@ -828,7 +828,7 @@ function getPartsOrder(orderId) {
 
 // ==========================================
 // パーツ集め完了 → 出庫_スキャンシートに記録
-// 列: 出荷日, カテゴリ, 商品コード, 数量, 空白, 注文番号
+// A=出荷日, B=カテゴリ, C=商品コード, D=数量, E=顧客名(空白), F=注文番号, G=備考(空白)
 // ==========================================
 function completePartsOrder(orderId, parts) {
   try {
@@ -837,14 +837,17 @@ function completePartsOrder(orderId, parts) {
     if (!sheet) return { success: false, message: '「出庫_スキャン」シートが見つかりません' };
     var today = getFormattedDate();
     var rows  = [];
-    for (var i = 0; i < parts.length; i++) {
-      // 出荷日, カテゴリ(空白), 商品コード, 数量, 空白, 注文番号
-      rows.push([today, '', parts[i].code, 1, '', orderId]);
+    if (parts && parts.length > 0) {
+      for (var i = 0; i < parts.length; i++) {
+        // A=出荷日, B=カテゴリ(空白), C=商品コード, D=数量, E=顧客名(空白), F=注文番号, G=備考(空白)
+        rows.push([today, '', parts[i].code, 1, '', orderId, '']);
+      }
+    } else {
+      // 管理者バイパス: parts なしで注文番号のみ1行
+      rows.push([today, '管理者出庫', '', 1, '', orderId, '']);
     }
-    if (rows.length) {
-      var lastRow = sheet.getLastRow() + 1;
-      sheet.getRange(lastRow, 1, rows.length, 6).setValues(rows);
-    }
+    var lastRow = sheet.getLastRow() + 1;
+    sheet.getRange(lastRow, 1, rows.length, 7).setValues(rows);
     return { success: true, count: rows.length };
   } catch(e) { return { success: false, message: e.message }; }
 }
