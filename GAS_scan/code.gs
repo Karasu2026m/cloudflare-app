@@ -869,6 +869,24 @@ function completePartsOrder(orderId, parts) {
     if (rows.length === 0) return { success: false, message: '記録するパーツがありません' };
     var lastRow = sheet.getLastRow() + 1;
     sheet.getRange(lastRow, 1, rows.length, 7).setValues(rows);
+
+    // 発注一覧シートの該当行 AD列(30列目)に「済」を記録
+    try {
+      var PARTS_SS_ID = '16kXJ4OWf66jXdBsBPhTl-wOEh-Q84oyU-j6r3bEV5ns';
+      var partsSS   = SpreadsheetApp.openById(PARTS_SS_ID);
+      var orderSheet = partsSS.getSheetByName('発注一覧');
+      if (orderSheet) {
+        var orderData = orderSheet.getDataRange().getValues();
+        var searchId  = String(orderId || '').trim();
+        for (var r = 0; r < orderData.length; r++) {
+          if (String(orderData[r][0] || '').trim() === searchId) {
+            orderSheet.getRange(r + 1, 30).setValue('済'); // AD列(index29) = 30列目
+            break;
+          }
+        }
+      }
+    } catch(ex) { /* 発注一覧への書き込みに失敗しても出庫記録は成功とする */ }
+
     return { success: true, count: rows.length };
   } catch(e) { return { success: false, message: e.message }; }
 }
