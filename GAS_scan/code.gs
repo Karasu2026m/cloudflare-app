@@ -827,27 +827,53 @@ function getPartsOrder(orderId) {
 }
 
 // ==========================================
-// パーツ集め完了 → 出庫_スキャンシートに記録
+// パーツ集め完了 → 出庫履歴シートに記録
 // A=出荷日, B=カテゴリ, C=商品コード, D=数量, E=顧客名(空白), F=注文番号, G=備考(空白)
 // ==========================================
 function completePartsOrder(orderId, parts) {
   try {
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('出庫_スキャン');
-    if (!sheet) return { success: false, message: '「出庫_スキャン」シートが見つかりません' };
+    var sheet = ss.getSheetByName('出庫履歴');
+    if (!sheet) return { success: false, message: '「出庫履歴」シートが見つかりません' };
     var today = getFormattedDate();
-    var rows  = [];
-    if (parts && parts.length > 0) {
-      for (var i = 0; i < parts.length; i++) {
-        // A=出荷日, B=カテゴリ(空白), C=商品コード, D=数量, E=顧客名(空白), F=注文番号, G=備考(空白)
-        rows.push([today, '', parts[i].code, 1, '', orderId, '']);
-      }
-    } else {
-      // 管理者バイパス: parts なしで注文番号のみ1行
-      rows.push([today, '管理者出庫', '', 1, '', orderId, '']);
+
+    // partsが空(管理者バイパス)のとき発注一覧から自動取得
+    var partsToWrite = (parts && parts.length > 0) ? parts : null;
+    if (!partsToWrite) {
+      var orderData = getPartsOrder(orderId);
+      if (!orderData.success) return { success: false, message: '発注一覧の取得失敗: ' + orderData.message };
+      partsToWrite = orderData.parts;
     }
+
+    // 商品マスタ_統合からカテゴリをルックアップ
+    var masterSheet = ss.getSheetByName('商品マスタ_統合');
+    var masterData  = masterSheet ? masterSheet.getDataRange().getValues() : [];
+
+    var rows = [];
+    for (var i = 0; i < partsToWrite.length; i++) {
+      var code     = partsToWrite[i].code;
+      var category = _lookupCategory(code, masterData);
+      // A=出荷日, B=カテゴリ, C=商品コード, D=数量, E=顧客名(空白), F=注文番号, G=備考(空白)
+      rows.push([today, category, code, 1, '', orderId, '']);
+    }
+
+    if (rows.length === 0) return { success: false, message: '記録するパーツがありません' };
     var lastRow = sheet.getLastRow() + 1;
     sheet.getRange(lastRow, 1, rows.length, 7).setValues(rows);
     return { success: true, count: rows.length };
   } catch(e) { return { success: false, message: e.message }; }
+}
+
+// 商品マスタ_統合 B/D/G列のコードでカテゴリ(C列)を返す
+function _lookupCategory(code, masterData) {
+  var s = String(code || '').trim().toLowerCase();
+  for (var i = 0; i < masterData.length; i++) {
+    var b = String(masterData[i][1] || '').trim().toLowerCase();
+    var d = String(masterData[i][3] || '').trim().toLowerCase();
+    var g = String(masterData[i][6] || '').trim().toLowerCase();
+    if (s && (b === s || d === s || g === s)) {
+      return String(masterData[i][2] || '').trim(); // C列=カテゴリ
+    }
+  }
+  return '';
 }
