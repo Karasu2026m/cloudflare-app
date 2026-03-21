@@ -408,6 +408,7 @@ function submitBulkCart(type, cartArray) {
     if (type === '組み立て') targetSheet = ss.getSheetByName('出庫_スキャン'); // 組み立ても実質は出庫
     if (type === '棚卸') targetSheet = ss.getSheetByName('棚卸');
     if (type === '不良報告') targetSheet = ss.getSheetByName('不良在庫');
+    if (type === '検証報告') targetSheet = ss.getSheetByName('不良在庫検証結果');
     
     if (!targetSheet) {
         // 棚卸だけは自動生成
