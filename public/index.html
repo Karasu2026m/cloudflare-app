@@ -2026,20 +2026,26 @@
       const input = document.getElementById('assemblyIdInput').value.trim();
       if (!partsChecklist.every(p => p.checked)) return;
       setStatus('⏳ 出庫履歴に記録中...', false);
+      let rawResult = null;
       try {
-        const res = await callAPI('completePartsOrder', {
+        rawResult = await callAPI('completePartsOrder', {
           orderId: input,
           parts: partsChecklist.map(p => ({ name: p.name, code: p.code }))
         });
-        if (!res.success) { playBeep('error'); setStatus('⚠️ ' + res.message, true); return; }
+        if (!rawResult.success) {
+          const msg = rawResult.message || '不明なエラー';
+          setStatus('⚠️ ' + msg, true);
+          alert('⚠️ 書き込み失敗:\n' + msg);
+          return;
+        }
       } catch(e) {
-        playBeep('error');
-        setStatus('⚠️ 記録エラー: ' + e.message, true);
+        setStatus('⚠️ 通信エラー: ' + e.message, true);
+        alert('⚠️ 通信エラー:\n' + e.message);
         return;
       }
       playBeep('complete');
       flashScreen('success');
-      setStatus(`🎉 パーツ集め完了！ [${input}]`, false);
+      setStatus(`🎉 パーツ集め完了！ [${input}] (${rawResult.count || 0}件記録)`, false);
       partsChecklist = [];
       renderPartsChecklist();
       document.getElementById('assemblyIdInput').value = '#';
