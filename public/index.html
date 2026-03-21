@@ -140,6 +140,13 @@
       box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
     }
 
+    .toggle-btn.active.verify {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: #06b6d4;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+    }
+
     /* Scanner UI */
     #reader {
       width: 100%;
@@ -829,6 +836,9 @@
         <div id="btnDefect" class="toggle-btn" onclick="setMode('不良報告')">
           <span class="material-icons-round" style="font-size:18px;">warning</span>不良報告
         </div>
+        <div id="btnVerify" class="toggle-btn" onclick="setMode('検証報告')">
+          <span class="material-icons-round" style="font-size:18px;">verified</span>検証報告
+        </div>
         <div id="btnAudit" class="toggle-btn" onclick="setMode('棚卸')">
           <span class="material-icons-round" style="font-size:18px;">fact_check</span>棚卸
         </div>
@@ -1198,8 +1208,8 @@
         b.className = b.className.replace(/active \w+/, '').trim();
       });
 
-      let btnMap = { '入庫': 'btnIn', '出庫': 'btnOut', '組み立て': 'btnAssembly', '棚卸': 'btnAudit', '不良報告': 'btnDefect' };
-      let clsMap = { '入庫': 'in', '出庫': 'out', '組み立て': 'assembly', '棚卸': 'audit', '不良報告': 'defect' };
+      let btnMap = { '入庫': 'btnIn', '出庫': 'btnOut', '組み立て': 'btnAssembly', '棚卸': 'btnAudit', '不良報告': 'btnDefect', '検証報告': 'btnVerify' };
+      let clsMap = { '入庫': 'in', '出庫': 'out', '組み立て': 'assembly', '棚卸': 'audit', '不良報告': 'defect', '検証報告': 'verify' };
 
       document.getElementById(btnMap[mode]).classList.add('active', clsMap[mode]);
       document.getElementById('assemblyArea').style.display = (mode === '組み立て') ? 'block' : 'none';
@@ -1280,6 +1290,7 @@
                 <option value="初期不良" ${item.defectReason === '初期不良' ? 'selected' : ''}>初期不良</option>
                 <option value="破損" ${item.defectReason === '破損' ? 'selected' : ''}>破損</option>
                 <option value="紛失" ${item.defectReason === '紛失' ? 'selected' : ''}>紛失</option>
+                <option value="SB" ${item.defectReason === 'SB' ? 'selected' : ''}>SB</option>
                 <option value="その他" ${item.defectReason === 'その他' ? 'selected' : ''}>その他</option>
               </select>
               <input type="text" class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);" 
@@ -1288,7 +1299,22 @@
                 onchange="cart[${index}].defectMemo = this.value">
             </div>
           `;
+        } else if (currentMode === '検証報告') {
+          extraInput = `
+            <div style="margin-top: 6px; display:flex; flex-direction:column; gap:6px;">
+              <select class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);" onchange="cart[${index}].verifyResult = this.value">
+                <option value="新品在庫" ${item.verifyResult === '新品在庫' ? 'selected' : ''}>新品在庫</option>
+                <option value="中古在庫" ${item.verifyResult === '中古在庫' ? 'selected' : ''}>中古在庫</option>
+                <option value="ジャンク" ${item.verifyResult === 'ジャンク' ? 'selected' : ''}>ジャンク</option>
+              </select>
+              <input type="text" class="input-box" style="margin:0; padding: 6px 12px; font-size:12px; background: rgba(0,0,0,0.2);"
+                placeholder="備考(例: 外観キズあり)"
+                value="${item.verifyMemo || ''}"
+                onchange="cart[${index}].verifyMemo = this.value">
+            </div>
+          `;
         }
+
 
         html += `
       <div class="cart-item" style="flex-direction: column; align-items: stretch;">
