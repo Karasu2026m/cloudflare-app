@@ -471,7 +471,8 @@ function submitBulkCart(type, cartArray) {
         }
     }
     
-    var nowText = getFormattedDate();
+    var nowText  = getFormattedDate();
+    var dateOnly = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd'); // 日付のみ
     var newRows = []; // 一括追加用配列
     
     for (var i = 0; i < cartArray.length; i++) {
@@ -559,13 +560,13 @@ function submitBulkCart(type, cartArray) {
                  }
              }
              
-             // 不良在庫シートの構成: スキャン時間, カテゴリ, 商品名, 数量, 不良選択, 備考
-             newRows.push([nowText, category, productName, qty, reason, memoText]);
+             // 不良在庫シートの構成: 日付, カテゴリ, 商品名, 数量, 不良選択, 備考
+             newRows.push([dateOnly, category, productName, qty, reason, memoText]);
         } else if (type === '検証報告') {
              let verifyResult = cartArray[i].verifyResult || '新品在庫';
              let verifyMemo   = cartArray[i].verifyMemo   || '';
              // 日付, カテゴリ, 商品コード, 数量, 分類, 備考
-             newRows.push([nowText, category, finalCode, qty, verifyResult, verifyMemo]);
+             newRows.push([dateOnly, category, finalCode, qty, verifyResult, verifyMemo]);
         }
     }
     
