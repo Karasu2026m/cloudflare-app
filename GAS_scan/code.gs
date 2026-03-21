@@ -806,7 +806,7 @@ function getPartsOrder(orderId) {
         // 除外ワード（部分一致）
         var EXCLUDE_WORDS = [
           'LANケーブル C8 3m', '180Hz', '240Hz', '360Hz',
-          'Microsoft Office 2021 Professional Plus'
+          'Microsoft Office 2021 Professional Plus', 'ナノダイヤモンドグリス'
         ];
         var parts = [];
         for (var j = 9; j <= 28; j++) {
@@ -835,7 +835,7 @@ function completePartsOrder(orderId, parts) {
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('出庫履歴');
     if (!sheet) return { success: false, message: '「出庫履歴」シートが見つかりません' };
-    var today = getFormattedDate();
+    var today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd');
 
     // partsが空(管理者バイパス)のとき発注一覧から自動取得
     var partsToWrite = (parts && parts.length > 0) ? parts : null;
