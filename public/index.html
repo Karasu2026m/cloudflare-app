@@ -856,6 +856,20 @@
       </div>
     </div>
 
+    <!-- 管理者専用: 発注番号一括出庫エリア（adminMode時のみ表示） -->
+    <div id="batchPartsArea" class="glass-panel" style="display:none; padding:12px 14px; margin-bottom:10px;">
+      <div style="font-size:12px; color:var(--accent-defect); font-weight:bold; margin-bottom:8px;">🚨 管理者限定: 発注番号一括出庫</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">発注番号を1行に1つ入力（済は自動スキップ）</div>
+      <textarea id="batchOrderIdsInput" class="input-box" style="height:90px; resize:vertical; text-align:left; padding:10px;" placeholder="発注番号1
+発注番号2
+発注番号3"></textarea>
+      <button class="action-btn" style="margin:4px 0 0; background:rgba(245,158,11,0.2); border-color:var(--accent-out); font-size:14px; padding:12px;" onclick="loadBatchPartsOrder()">一括番号を確認</button>
+      <div id="batchPartsPreview" style="margin-top:8px;"></div>
+      <button id="batchSubmitBtn" class="action-btn" onclick="submitBatchPartsOrder()" style="display:none; background:rgba(239,68,68,0.3); border-color:var(--accent-defect); margin-top:6px; font-size:14px; padding:12px;">
+        <span class="material-icons-round">cloud_upload</span>
+        一括出庫を確定する
+      </button>
+    </div>
 
     <!-- リアルタイムカメラスキャン -->
     <button class="camera-toggle-btn" id="cameraToggleBtn" onclick="toggleCamera()">
@@ -1177,6 +1191,9 @@
         document.getElementById('adminToggleBtn').innerText = "管理者モードON";
       }
       updateAssemblyListUI();
+      // 管理者一括出庫エリアの表示制御（パーツ集めモード中のみ表示）
+      const batchArea = document.getElementById('batchPartsArea');
+      if (batchArea) batchArea.style.display = (adminMode && currentMode === '組み立て') ? 'block' : 'none';
     }
 
     function setStatus(msg, isError) {
@@ -1223,6 +1240,10 @@
       if (floatBtn)   floatBtn.style.display   = isAssembly ? 'none' : 'flex';
       if (listArea && !isAssembly) listArea.style.display = 'none'; // 模ード切替時に非表示
       if (isAssembly) { partsChecklist = []; renderPartsChecklist(); } // リセット
+
+      // 管理者一括出庫エリア: パーツ集めモードかつ管理者モード時のみ表示
+      const batchArea2 = document.getElementById('batchPartsArea');
+      if (batchArea2) batchArea2.style.display = (isAssembly && adminMode) ? 'block' : 'none';
 
       setStatus(`<span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span><br>【${mode}】スキャン待ち`, false);
 
@@ -2032,6 +2053,13 @@
       try {
         const res = await callAPI('getPartsOrder', { orderId: input });
         if (!res.success) { playBeep('error'); setStatus('⚠️ ' + res.message, true); return; }
+        // 出庫済みチェック
+        if (res.alreadyShipped) {
+          playBeep('error');
+          flashScreen('error');
+          setStatus('⚠️ 発注番号 [' + input + '] はすでに出庫済みです（AD列:済）', true);
+          return;
+        }
         partsChecklist = (res.parts || []).map(p => ({ ...p, checked: false }));
         renderPartsChecklist();
         setStatus(`✅ 指示書 [${input}] 読込完了 ― ${partsChecklist.length}件`, false);

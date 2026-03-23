@@ -54,6 +54,9 @@ function doPost(e) {
       case 'completePartsOrder':
         result = completePartsOrder(json.orderId, json.parts);
         break;
+      case 'batchCompletePartsOrder':
+        result = batchCompletePartsOrder(json.orderIds);
+        break;
       case 'ping':
         result = { success: true, message: 'pong', timestamp: getFormattedDate(),
           knownActions: ['submitBulkCart','getAssemblyOrder','undoLastScan','getHistory',
@@ -828,7 +831,8 @@ function getPartsOrder(orderId) {
           }
           if (!skip) parts.push({ name: val, code: val });
         }
-        return { success: true, orderId: searchId, parts: parts };
+        var adVal = String(data[i][29] || '').trim(); // AD列(index 29)
+        return { success: true, orderId: searchId, parts: parts, alreadyShipped: (adVal === '済') };
       }
     }
     return { success: false, message: '発注番号 [' + searchId + '] が見つかりません' };
@@ -841,6 +845,23 @@ function getPartsOrder(orderId) {
 // ==========================================
 function completePartsOrder(orderId, parts) {
   try {
+    // --- 二重出庫チェック ---
+    var PARTS_SS_ID = '16kXJ4OWf66jXdBsBPhTl-wOEh-Q84oyU-j6r3bEV5ns';
+    var checkSS     = SpreadsheetApp.openById(PARTS_SS_ID);
+    var checkSheet  = checkSS.getSheetByName('発注一覧');
+    if (checkSheet) {
+      var checkData = checkSheet.getDataRange().getValues();
+      var sid = String(orderId || '').trim();
+      for (var c = 0; c < checkData.length; c++) {
+        if (String(checkData[c][0] || '').trim() === sid) {
+          if (String(checkData[c][29] || '').trim() === '済') {
+            return { success: false, message: '⚠️ 発注番号 [' + sid + '] はすでに出庫済みです（AD列:済）' };
+          }
+          break;
+        }
+      }
+    }
+
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('出庫履歴');
     if (!sheet) return { success: false, message: '「出庫履歴」シートが見つかりません' };
@@ -903,4 +924,35 @@ function _lookupCategory(code, masterData) {
     }
   }
   return '';
+}
+
+// ==========================================
+// 複数発注番号を一括出庫（管理者専用）
+// orderIds: ['発注番号1', '発注番号2', ...]
+// ==========================================
+function batchCompletePartsOrder(orderIds) {
+  if (!orderIds || orderIds.length === 0) {
+    return { success: false, message: '発注番号リストが空です' };
+  }
+  var results = [];
+  for (var i = 0; i < orderIds.length; i++) {
+    var id = String(orderIds[i] || '').trim();
+    if (!id) continue;
+    // まずパーツ取得
+    var orderData = getPartsOrder(id);
+    if (!orderData.success) {
+      results.push({ orderId: id, success: false, message: orderData.message });
+      continue;
+    }
+    if (orderData.alreadyShipped) {
+      results.push({ orderId: id, success: false, skipped: true, message: '出庫済み（AD列:済）' });
+      continue;
+    }
+    // 出庫実行
+    var completeResult = completePartsOrder(id, orderData.parts);
+    results.push({ orderId: id, success: completeResult.success, message: completeResult.message || '' });
+  }
+  var successCount = results.filter(function(r) { return r.success; }).length;
+  var skippedCount = results.filter(function(r) { return r.skipped; }).length;
+  return { success: true, results: results, successCount: successCount, skippedCount: skippedCount };
 }
