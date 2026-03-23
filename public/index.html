@@ -848,14 +848,16 @@
     <!-- パーツ集め 入力エリア（カメラの上） -->
     <div id="assemblyArea" class="glass-panel" style="display:none; padding:10px 14px;">
       <div style="font-size:12px; color:var(--accent-assembly); font-weight:bold; margin-bottom:6px;">
-        📦 指示書番号を入力（空白区切りで複数可: #0000 #0001）
+        📦 指示書番号を入力
       </div>
       <div style="display:flex; gap:8px;">
-        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0; font-size:14px;" value="#" placeholder="#0000 または #0000 #0001 #0002" autocomplete="off">
+        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0; font-size:14px;" value="#"
+          placeholder="#0000 または #0000 #0001 #0002" autocomplete="off">
         <button class="action-btn" style="width:auto; margin:0; padding:0 14px;" onclick="loadPartsOrder()">読込</button>
       </div>
       <div id="batchPartsPreview" style="margin-top:8px;"></div>
-      <button id="batchSubmitBtn" class="action-btn" onclick="submitBatchPartsOrder()" style="display:none; background:rgba(239,68,68,0.3); border-color:var(--accent-defect); margin-top:6px; font-size:14px; padding:12px;">
+      <button id="batchSubmitBtn" class="action-btn" onclick="submitBatchPartsOrder()"
+        style="display:none; background:rgba(239,68,68,0.3); border-color:var(--accent-defect); margin-top:6px; font-size:14px; padding:12px;">
         <span class="material-icons-round">cloud_upload</span>
         一括出庫を確定する
       </button>
@@ -887,14 +889,14 @@
 
     <!-- 指示書リスト（パーツ集めモードのみ・スクロール可能） -->
     <div id="partsListArea" style="display:none; margin-top:10px;">
-      <div style="font-size:11px; color:var(--accent-assembly); font-weight:600; margin-bottom:4px; letter-spacing:.5px;">📋 指示書</div>
-      <div id="assemblyPartsList"
-        style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08);
+      <div
+        style="font-size:11px; color:var(--accent-assembly); font-weight:600; margin-bottom:4px; letter-spacing:.5px;">
+        📋 指示書</div>
+      <div id="assemblyPartsList" style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08);
           border-radius:10px; max-height:230px; overflow-y:auto;">
         <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:14px;">指示書を読み込んでください</div>
       </div>
-      <button id="partsCompleteBtn" onclick="completePartsCollection()" disabled
-        style="width:100%; margin-top:8px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);
+      <button id="partsCompleteBtn" onclick="completePartsCollection()" disabled style="width:100%; margin-top:8px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);
           color:#10b981; border-radius:10px; padding:12px; font-size:14px; font-weight:700; cursor:pointer;
           display:flex; align-items:center; justify-content:center; gap:8px;">
         <span class="material-icons-round">task_alt</span> パーツ集め完了
@@ -903,33 +905,33 @@
 
     <!-- ========= タブナビゲーション（パーツ集め以外のモードのみ表示） ========= -->
     <div id="subTabArea">
-    <div style="display:flex; gap:8px; margin-top:14px;">
-      <button class="sub-tab-btn active" id="tabBtnBulk" onclick="switchSubTab('bulk')">
-        <span class="material-icons-round" style="font-size:15px;">category</span>
-        まとめて<span id="tabBulkLabel">入庫</span>
-      </button>
-      <button class="sub-tab-btn" id="tabBtnHistory" onclick="switchSubTab('history')">
-        <span class="material-icons-round" style="font-size:15px;">history</span>
-        <span id="tabHistoryLabel">入庫</span>履歴
-      </button>
-    </div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="sub-tab-btn active" id="tabBtnBulk" onclick="switchSubTab('bulk')">
+          <span class="material-icons-round" style="font-size:15px;">category</span>
+          まとめて<span id="tabBulkLabel">入庫</span>
+        </button>
+        <button class="sub-tab-btn" id="tabBtnHistory" onclick="switchSubTab('history')">
+          <span class="material-icons-round" style="font-size:15px;">history</span>
+          <span id="tabHistoryLabel">入庫</span>履歴
+        </button>
+      </div>
 
-    <!-- ========= まとめてパネル ========= -->
-    <div id="tabBulkPanel" class="sub-tab-panel glass-panel" style="padding:14px; margin-top:10px;">
-      <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">カテゴリを選択</div>
-      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;" id="categoryGrid">
-      </div>
-      <!-- 品目一覧エリア（カテゴリ選択後に展開） -->
-      <div id="categoryItemPanel"
-        style="display:none; margin-top:14px; border-top:1px solid var(--card-border); padding-top:12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <span id="categoryItemTitle" style="font-size:13px; font-weight:600; color:var(--text-main);"></span>
-          <button onclick="document.getElementById('categoryItemPanel').style.display='none'"
-            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;">✕</button>
+      <!-- ========= まとめてパネル ========= -->
+      <div id="tabBulkPanel" class="sub-tab-panel glass-panel" style="padding:14px; margin-top:10px;">
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">カテゴリを選択</div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;" id="categoryGrid">
         </div>
-        <div id="categoryItemList"></div>
+        <!-- 品目一覧エリア（カテゴリ選択後に展開） -->
+        <div id="categoryItemPanel"
+          style="display:none; margin-top:14px; border-top:1px solid var(--card-border); padding-top:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span id="categoryItemTitle" style="font-size:13px; font-weight:600; color:var(--text-main);"></span>
+            <button onclick="document.getElementById('categoryItemPanel').style.display='none'"
+              style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;">✕</button>
+          </div>
+          <div id="categoryItemList"></div>
+        </div>
       </div>
-    </div>
     </div> <!-- /subTabArea -->
 
     <div id="tabHistoryPanel" class="sub-tab-panel glass-panel" style="display:none; padding:14px; margin-top:10px;">
@@ -1168,7 +1170,7 @@
 
     function toggleAdminMode() {
       if (!adminMode) {
-        if (!confirm("⚠️ 【警告】管理者モードをオンにしますか？\n\n機能: バーコードを一切読み込まずに手動で強制的・無制限に出庫チェックが行えるようになります。\n注意: ミス（商品の取り違えや在庫ズレ）が直接発生するリスクがあるため、バーコードが存在しないパーツ等の緊急時にのみ、細心の注意を払って使用してください。")) return;
+        if (!confirm("⚠️ 【警告】管理者モードをオンにしますか？")) return;
         adminMode = true;
         document.getElementById('adminToggleBtn').style.background = "rgba(239, 68, 68, 0.8)";
         document.getElementById('adminToggleBtn').style.color = "white";
@@ -1220,11 +1222,11 @@
 
       // サブタブ・フローティングボタン → パーツ集めモードでは非表示
       const isAssembly = mode === '組み立て';
-      const subTabArea  = document.getElementById('subTabArea');
-      const floatBtn    = document.querySelector('.floating-cart-btn');
-      const listArea    = document.getElementById('partsListArea');
+      const subTabArea = document.getElementById('subTabArea');
+      const floatBtn = document.querySelector('.floating-cart-btn');
+      const listArea = document.getElementById('partsListArea');
       if (subTabArea) subTabArea.style.display = isAssembly ? 'none' : 'block';
-      if (floatBtn)   floatBtn.style.display   = isAssembly ? 'none' : 'flex';
+      if (floatBtn) floatBtn.style.display = isAssembly ? 'none' : 'flex';
       if (listArea && !isAssembly) listArea.style.display = 'none'; // 模ード切替時に非表示
       if (isAssembly) { partsChecklist = []; renderPartsChecklist(); } // リセット
       // モード切替時にバッチプレビューをリセット
@@ -2034,8 +2036,8 @@
         if (adminMode) {
           partsChecklist = [];
           const listArea = document.getElementById('partsListArea');
-          const listEl   = document.getElementById('assemblyPartsList');
-          const btn      = document.getElementById('partsCompleteBtn');
+          const listEl = document.getElementById('assemblyPartsList');
+          const btn = document.getElementById('partsCompleteBtn');
           if (listArea) listArea.style.display = 'block';
           if (listEl) listEl.innerHTML =
             '<div style="text-align:center; padding:16px; color:var(--accent-assembly); font-size:13px;">' +
@@ -2060,7 +2062,7 @@
           partsChecklist = (res.parts || []).map(p => ({ ...p, checked: false }));
           renderPartsChecklist();
           setStatus(`✅ 指示書 [${input}] 読込完了 ― ${partsChecklist.length}件`, false);
-        } catch(e) {
+        } catch (e) {
           playBeep('error');
           setStatus('⚠️ 通信エラー: ' + e.message, true);
         }
@@ -2079,13 +2081,13 @@
           try {
             const res = await callAPI('getPartsOrder', { orderId: id });
             return { orderId: id, ...res };
-          } catch(e) {
+          } catch (e) {
             return { orderId: id, success: false, message: '通信エラー: ' + e.message };
           }
         }));
         _renderBatchPreview(tmpResults);
         setStatus('📋 ' + ids.length + '件の確認完了。出庫対象を確認してください', false);
-      } catch(e) {
+      } catch (e) {
         setStatus('⚠️ 通信エラー: ' + e.message, true);
       }
     }
@@ -2137,7 +2139,7 @@
         btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> 一括出庫を確定する';
         _batchPreviewData = [];
         setStatus(summary, false);
-      } catch(e) {
+      } catch (e) {
         playBeep('error');
         alert('通信エラー: ' + e.message);
         btn.disabled = false;
@@ -2146,8 +2148,8 @@
     }
 
     function renderPartsChecklist() {
-      const listEl   = document.getElementById('assemblyPartsList');
-      const btn      = document.getElementById('partsCompleteBtn');
+      const listEl = document.getElementById('assemblyPartsList');
+      const btn = document.getElementById('partsCompleteBtn');
       const listArea = document.getElementById('partsListArea');
       if (!partsChecklist.length) {
         if (listArea) listArea.style.display = 'none';
@@ -2184,7 +2186,7 @@
           alert('⚠️ 書き込み失敗:\n' + msg);
           return;
         }
-      } catch(e) {
+      } catch (e) {
         setStatus('⚠️ 通信エラー: ' + e.message, true);
         alert('⚠️ 通信エラー:\n' + e.message);
         return;
