@@ -848,22 +848,12 @@
     <!-- パーツ集め 入力エリア（カメラの上） -->
     <div id="assemblyArea" class="glass-panel" style="display:none; padding:10px 14px;">
       <div style="font-size:12px; color:var(--accent-assembly); font-weight:bold; margin-bottom:6px;">
-        📦 指示書番号を入力
+        📦 指示書番号を入力（空白区切りで複数可: #0000 #0001）
       </div>
       <div style="display:flex; gap:8px;">
-        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0; font-size:14px;" value="#" placeholder="#PC-001..." autocomplete="off">
+        <input type="text" id="assemblyIdInput" class="input-box" style="margin:0; font-size:14px;" value="#" placeholder="#0000 または #0000 #0001 #0002" autocomplete="off">
         <button class="action-btn" style="width:auto; margin:0; padding:0 14px;" onclick="loadPartsOrder()">読込</button>
       </div>
-    </div>
-
-    <!-- 管理者専用: 発注番号一括出庫エリア（adminMode時のみ表示） -->
-    <div id="batchPartsArea" class="glass-panel" style="display:none; padding:12px 14px; margin-bottom:10px;">
-      <div style="font-size:12px; color:var(--accent-defect); font-weight:bold; margin-bottom:8px;">🚨 管理者限定: 発注番号一括出庫</div>
-      <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">発注番号を1行に1つ入力（済は自動スキップ）</div>
-      <textarea id="batchOrderIdsInput" class="input-box" style="height:90px; resize:vertical; text-align:left; padding:10px;" placeholder="発注番号1
-発注番号2
-発注番号3"></textarea>
-      <button class="action-btn" style="margin:4px 0 0; background:rgba(245,158,11,0.2); border-color:var(--accent-out); font-size:14px; padding:12px;" onclick="loadBatchPartsOrder()">一括番号を確認</button>
       <div id="batchPartsPreview" style="margin-top:8px;"></div>
       <button id="batchSubmitBtn" class="action-btn" onclick="submitBatchPartsOrder()" style="display:none; background:rgba(239,68,68,0.3); border-color:var(--accent-defect); margin-top:6px; font-size:14px; padding:12px;">
         <span class="material-icons-round">cloud_upload</span>
@@ -1191,9 +1181,6 @@
         document.getElementById('adminToggleBtn').innerText = "管理者モードON";
       }
       updateAssemblyListUI();
-      // 管理者一括出庫エリアの表示制御（パーツ集めモード中のみ表示）
-      const batchArea = document.getElementById('batchPartsArea');
-      if (batchArea) batchArea.style.display = (adminMode && currentMode === '組み立て') ? 'block' : 'none';
     }
 
     function setStatus(msg, isError) {
@@ -1240,10 +1227,11 @@
       if (floatBtn)   floatBtn.style.display   = isAssembly ? 'none' : 'flex';
       if (listArea && !isAssembly) listArea.style.display = 'none'; // 模ード切替時に非表示
       if (isAssembly) { partsChecklist = []; renderPartsChecklist(); } // リセット
-
-      // 管理者一括出庫エリア: パーツ集めモードかつ管理者モード時のみ表示
-      const batchArea2 = document.getElementById('batchPartsArea');
-      if (batchArea2) batchArea2.style.display = (isAssembly && adminMode) ? 'block' : 'none';
+      // モード切替時にバッチプレビューをリセット
+      const batchPreview = document.getElementById('batchPartsPreview');
+      if (batchPreview) batchPreview.innerHTML = '';
+      const batchBtn = document.getElementById('batchSubmitBtn');
+      if (batchBtn) batchBtn.style.display = 'none';
 
       setStatus(`<span class="material-icons-round" style="font-size:32px; margin-bottom:8px; opacity:0.5;">inventory_2</span><br>【${mode}】スキャン待ち`, false);
 
@@ -2026,49 +2014,133 @@
 
     // ========= パーツ集め =========
     let partsChecklist = []; // [{ name, code, checked }]
+    let _batchPreviewData = [];
 
     async function loadPartsOrder() {
-      const input = document.getElementById('assemblyIdInput').value.trim();
-      if (!input || input === '#') { setStatus('⚠️ 発注番号を入力してください', true); return; }
+      const raw = document.getElementById('assemblyIdInput').value.trim();
+      if (!raw || raw === '#') { setStatus('⚠️ 発注番号を入力してください', true); return; }
 
-      // 管理者モードバイパス: 指示書なしで出庫ボタンのみ表示
-      if (adminMode) {
-        partsChecklist = []; // 空のまま → every() = true → 完了ボタン有効
-        const listArea = document.getElementById('partsListArea');
-        const listEl   = document.getElementById('assemblyPartsList');
-        const btn      = document.getElementById('partsCompleteBtn');
-        if (listArea) listArea.style.display = 'block';
-        if (listEl) listEl.innerHTML =
-          '<div style="text-align:center; padding:16px; color:var(--accent-assembly); font-size:13px;">' +
-          '🔓 管理者モード：指示書確認をスキップして出庫します<br>' +
-          '<span style="font-size:11px; color:var(--text-muted);">注文 [' + input + ']</span></div>';
-        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-round">local_shipping</span> 出庫する'; }
-        setStatus('🔓 管理者モード: [' + input + '] 出庫準備完了', false);
+      // 空白区切りで複数IDを解析
+      const ids = raw.split(/\s+/).map(s => s.trim()).filter(s => s && s !== '#');
+      if (ids.length === 0) { setStatus('⚠️ 発注番号を入力してください', true); return; }
+
+      // 1件の場合: 管理者バイパスまたは通常フロー（既存動作）
+      if (ids.length === 1) {
+        const input = ids[0];
+        // 管理者モードバイパス: 指示書なしで出庫ボタンのみ表示
+        if (adminMode) {
+          partsChecklist = [];
+          const listArea = document.getElementById('partsListArea');
+          const listEl   = document.getElementById('assemblyPartsList');
+          const btn      = document.getElementById('partsCompleteBtn');
+          if (listArea) listArea.style.display = 'block';
+          if (listEl) listEl.innerHTML =
+            '<div style="text-align:center; padding:16px; color:var(--accent-assembly); font-size:13px;">' +
+            '🔓 管理者モード：指示書確認をスキップして出庫します<br>' +
+            '<span style="font-size:11px; color:var(--text-muted);">注文 [' + input + ']</span></div>';
+          if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-round">local_shipping</span> 出庫する'; }
+          setStatus('🔓 管理者モード: [' + input + '] 出庫準備完了', false);
+          return;
+        }
+        setStatus('⏳ 指示書読み込み中...', false);
+        partsChecklist = [];
+        renderPartsChecklist();
+        try {
+          const res = await callAPI('getPartsOrder', { orderId: input });
+          if (!res.success) { playBeep('error'); setStatus('⚠️ ' + res.message, true); return; }
+          if (res.alreadyShipped) {
+            playBeep('error');
+            flashScreen('error');
+            setStatus('⚠️ 発注番号 [' + input + '] はすでに出庫済みです（AD列:済）', true);
+            return;
+          }
+          partsChecklist = (res.parts || []).map(p => ({ ...p, checked: false }));
+          renderPartsChecklist();
+          setStatus(`✅ 指示書 [${input}] 読込完了 ― ${partsChecklist.length}件`, false);
+        } catch(e) {
+          playBeep('error');
+          setStatus('⚠️ 通信エラー: ' + e.message, true);
+        }
         return;
       }
 
-      setStatus('⏳ 指示書読み込み中...', false);
-      partsChecklist = [];
-      renderPartsChecklist();
+      // 複数件の場合: バッチプレビュー表示
+      const previewEl = document.getElementById('batchPartsPreview');
+      previewEl.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">⏳ ' + ids.length + '件を確認中...</div>';
+      document.getElementById('batchSubmitBtn').style.display = 'none';
+      _batchPreviewData = [];
+      setStatus('⏳ ' + ids.length + '件を一括確認中...', false);
+
       try {
-        const res = await callAPI('getPartsOrder', { orderId: input });
-        if (!res.success) { playBeep('error'); setStatus('⚠️ ' + res.message, true); return; }
-        // 出庫済みチェック
-        if (res.alreadyShipped) {
-          playBeep('error');
-          flashScreen('error');
-          setStatus('⚠️ 発注番号 [' + input + '] はすでに出庫済みです（AD列:済）', true);
-          return;
-        }
-        partsChecklist = (res.parts || []).map(p => ({ ...p, checked: false }));
-        renderPartsChecklist();
-        setStatus(`✅ 指示書 [${input}] 読込完了 ― ${partsChecklist.length}件`, false);
+        const tmpResults = await Promise.all(ids.map(async id => {
+          try {
+            const res = await callAPI('getPartsOrder', { orderId: id });
+            return { orderId: id, ...res };
+          } catch(e) {
+            return { orderId: id, success: false, message: '通信エラー: ' + e.message };
+          }
+        }));
+        _renderBatchPreview(tmpResults);
+        setStatus('📋 ' + ids.length + '件の確認完了。出庫対象を確認してください', false);
       } catch(e) {
-        playBeep('error');
         setStatus('⚠️ 通信エラー: ' + e.message, true);
       }
     }
 
+    function _renderBatchPreview(results) {
+      _batchPreviewData = results;
+      let html = '<div style="display:flex; flex-direction:column; gap:6px;">';
+      let hasShippable = false;
+      results.forEach(r => {
+        let color, icon, msg;
+        if (!r.success) {
+          color = '#94a3b8'; icon = '❓'; msg = r.message || '不明なエラー';
+        } else if (r.alreadyShipped) {
+          color = '#f59e0b'; icon = '⏭️'; msg = '出庫済み（スキップ）';
+        } else {
+          color = '#10b981'; icon = '📦'; msg = (r.parts ? r.parts.length : 0) + '点 → 出庫対象';
+          hasShippable = true;
+        }
+        html += '<div style="font-size:12px; color:' + color + '; padding:4px 8px; background:rgba(0,0,0,0.2); border-radius:6px;">' + icon + ' <b>' + r.orderId + '</b>: ' + msg + '</div>';
+      });
+      html += '</div>';
+      document.getElementById('batchPartsPreview').innerHTML = html;
+      const btn = document.getElementById('batchSubmitBtn');
+      btn.style.display = hasShippable ? 'block' : 'none';
+    }
+
+    async function submitBatchPartsOrder() {
+      const shippable = _batchPreviewData.filter(r => r.success && !r.alreadyShipped);
+      if (shippable.length === 0) { alert('出庫対象の発注番号がありません'); return; }
+      const ids = shippable.map(r => r.orderId);
+      if (!confirm('以下 ' + ids.length + ' 件を一括出庫します。\n\n' + ids.join('\n') + '\n\nよろしいですか？')) return;
+      const btn = document.getElementById('batchSubmitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-icons-round">sync</span> 処理中...';
+      try {
+        const res = await callAPI('batchCompletePartsOrder', { orderIds: ids });
+        playBeep('complete');
+        flashScreen('success');
+        if (res.results) _renderBatchPreview(res.results.map(r => ({
+          orderId: r.orderId, success: r.success,
+          alreadyShipped: r.skipped || false, message: r.message, parts: []
+        })));
+        const previewEl = document.getElementById('batchPartsPreview');
+        const summary = '✅ 一括出庫完了！ 成功: ' + res.successCount + '件 / スキップ: ' + res.skippedCount + '件';
+        previewEl.innerHTML = '<div style="color:#10b981; font-weight:bold; margin-bottom:8px; font-size:13px;">' + summary + '</div>' + previewEl.innerHTML;
+        document.getElementById('assemblyIdInput').value = '#';
+        btn.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> 一括出庫を確定する';
+        _batchPreviewData = [];
+        setStatus(summary, false);
+      } catch(e) {
+        playBeep('error');
+        alert('通信エラー: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> 一括出庫を確定する';
+      }
+    }
 
     function renderPartsChecklist() {
       const listEl   = document.getElementById('assemblyPartsList');
@@ -2091,7 +2163,10 @@
     }
 
     async function completePartsCollection() {
-      const input = document.getElementById('assemblyIdInput').value.trim();
+      // 入力欄から最初の1件を使用（単発フロー）
+      const raw = document.getElementById('assemblyIdInput').value.trim();
+      const ids = raw.split(/\s+/).map(s => s.trim()).filter(s => s && s !== '#');
+      const input = ids[0] || raw;
       if (!partsChecklist.every(p => p.checked)) return;
       setStatus('⏳ 出庫履歴に記録中...', false);
       let rawResult = null;
