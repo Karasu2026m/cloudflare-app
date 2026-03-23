@@ -2024,9 +2024,12 @@
       const ids = raw.split(/\s+/).map(s => s.trim()).filter(s => s && s !== '#');
       if (ids.length === 0) { setStatus('⚠️ 発注番号を入力してください', true); return; }
 
+      // 管理者モード以外は複数入力不可 → 1件目のみ使用
+      const effectiveIds = (ids.length > 1 && !adminMode) ? [ids[0]] : ids;
+
       // 1件の場合: 管理者バイパスまたは通常フロー（既存動作）
-      if (ids.length === 1) {
-        const input = ids[0];
+      if (effectiveIds.length === 1) {
+        const input = effectiveIds[0];
         // 管理者モードバイパス: 指示書なしで出庫ボタンのみ表示
         if (adminMode) {
           partsChecklist = [];

@@ -1443,13 +1443,16 @@
       const ids = raw.split(/\s+/).map(function(s){ return s.trim(); }).filter(function(s){ return s && s !== '#'; });
       if (ids.length === 0) { alert('発注番号を入力してください'); return; }
 
+      // 管理者モード以外は複数入力不可 → 1件目のみ使用
+      var effectiveIds = (ids.length > 1 && !adminMode) ? [ids[0]] : ids;
+
       // 1件の場合: 元の単発出庫フロー
-      if (ids.length === 1) {
-        _loadAndShipSingle(ids[0]);
+      if (effectiveIds.length === 1) {
+        _loadAndShipSingle(effectiveIds[0]);
         return;
       }
 
-      // 複数件: バッチプレビュー
+      // 複数件（管理者モードのみ）: バッチプレビュー
       const previewEl = document.getElementById('batchPartsPreview');
       previewEl.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">⏳ ' + ids.length + '件を確認中...</div>';
       document.getElementById('batchSubmitBtn').style.display = 'none';
